@@ -7,17 +7,38 @@ import {
   StatusBar,
   StyleSheet,
   Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { loginUser } from '../utils/api';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [email,        setEmail]        = useState('');
+  const [password,     setPassword]     = useState('');
+  const [rememberMe,   setRememberMe]   = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading,      setLoading]      = useState(false);
   const router = useRouter();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter your email and password');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await loginUser(email, password);
+      router.push('/home');
+    } catch (error: any) {
+      Alert.alert('Login Failed', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -33,7 +54,7 @@ export default function LoginScreen() {
               <Image source={require('../assets/images/gmail.png')} style={styles.icon} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="Email or Phone number"
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -77,14 +98,21 @@ export default function LoginScreen() {
                 <Text style={styles.rememberMeText}>Remember me</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/forgot_password')}>
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
 
             {/* Sign In Button */}
-            <TouchableOpacity style={styles.signInButton}>
-              <Text style={styles.signInButtonText}>Sign in</Text>
+            <TouchableOpacity
+              style={styles.signInButton}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.signInButtonText}>Sign in</Text>
+              }
             </TouchableOpacity>
 
             <Text style={styles.orSignInText}>-Or sign in with-</Text>

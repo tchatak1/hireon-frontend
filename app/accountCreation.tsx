@@ -10,17 +10,56 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { registerUser } from '../utils/api';
 
 const MyComponent = () => {
-  const [text, setText] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [name,            setName]            = useState('');
+  const [email,           setEmail]           = useState('');
+  const [password,        setPassword]        = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword,    setShowPassword]    = useState(false);
+  const [showConfirm,     setShowConfirm]     = useState(false);
+  const [loading,         setLoading]         = useState(false);
   const router = useRouter();
+
+  const handleRegister = async () => {
+    // Validation
+    if (!name || !email || !password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await registerUser({
+        name,
+        email,
+        phone_number: '+237000000000', // will come from profile_setup later
+        password,
+      });
+      router.push('/registration_success');
+    } catch (error: any) {
+      Alert.alert('Registration Failed', error.message);
+      router.push('/registration_failure');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -41,8 +80,8 @@ const MyComponent = () => {
                   <Image source={require('../assets/images/User.png')} style={styles.icon} />
                   <TextInput
                     style={styles.input}
-                    value={text}
-                    onChangeText={setText}
+                    value={name}
+                    onChangeText={setName}
                     placeholder="Full Name"
                     placeholderTextColor="#999"
                   />
@@ -53,6 +92,8 @@ const MyComponent = () => {
                   <Image source={require('../assets/images/gmail.png')} style={styles.icon} />
                   <TextInput
                     style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
                     placeholder="Email"
                     placeholderTextColor="#999"
                     keyboardType="email-address"
@@ -65,6 +106,8 @@ const MyComponent = () => {
                   <Image source={require('../assets/images/lock.png')} style={styles.icon} />
                   <TextInput
                     style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
                     placeholder="Password"
                     secureTextEntry={!showPassword}
                     placeholderTextColor="#999"
@@ -83,6 +126,8 @@ const MyComponent = () => {
                   <Image source={require('../assets/images/lock.png')} style={styles.icon} />
                   <TextInput
                     style={styles.input}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
                     placeholder="Confirm Password"
                     secureTextEntry={!showConfirm}
                     placeholderTextColor="#999"
@@ -96,8 +141,16 @@ const MyComponent = () => {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.signUp}>
-                  <Text style={{ fontWeight: 'bold' }}>Sign up</Text>
+                {/* Sign Up Button */}
+                <TouchableOpacity
+                  style={styles.signUp}
+                  onPress={handleRegister}
+                  disabled={loading}
+                >
+                  {loading
+                    ? <ActivityIndicator color="white" />
+                    : <Text style={{ fontWeight: 'bold' }}>Sign up</Text>
+                  }
                 </TouchableOpacity>
 
                 <View style={styles.Or}>
