@@ -1,172 +1,340 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  TextInput,
-  Modal,
-  FlatList,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
-  StatusBar,
+  View, Text, StyleSheet, TouchableOpacity, Image,
+  TextInput, ScrollView, Modal, FlatList,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateProfile, uploadProfilePicture } from '../utils/api';
 
 const REGIONS = [
-  'Adamaoua', 'Centre', 'East', 'Far North', 'Littoral', 'North',
-  'North West', 'South', 'South West',
+  { code: 'Adamaoua',   name: 'Adamaoua' },
+  { code: 'Centre',     name: 'Centre' },
+  { code: 'East',       name: 'East' },
+  { code: 'Far North',  name: 'Far North' },
+  { code: 'Littoral',   name: 'Littoral' },
+  { code: 'North',      name: 'North' },
+  { code: 'North West', name: 'North West' },
+  { code: 'South',      name: 'South' },
+  { code: 'South West', name: 'South West' },
 ];
 
 const SKILLS = [
-  'Electrician', 'Plumber', 'Mechanic', 'Carpenter', 'Tiler',
-  'Painter', 'Computer repair technician', 'Photographer',
+  'Electrician', 'Plumber', 'Mechanic', 'Carpenter',
+  'Tiler', 'Painter', 'Computer repair technician', 'Photographer',
 ];
 
-export default function ProfileSetupScreen() {
-  const [imageUri, setImageUri] = useState(null);
-  const [region, setRegion] = useState(null);
-  const [skill, setSkill] = useState(null);
-  const [age, setAge] = useState('');
-  const [city, setCity] = useState('');
-  const [phone, setPhone] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState(null);
+const PHONE_CODES = ['+237', '+1', '+33', '+44', '+234'];
 
+export default function EditProfileScreen() {
+  const router = useRouter();
+
+  // Form state
+  const [name,      setName]      = useState('');
+  const [email,     setEmail]     = useState('');
+  const [city,      setCity]      = useState('');
+  const [age,       setAge]       = useState('');
+  const [bio, setBio] = useState('');
+  const [region,    setRegion]    = useState('');
+  const [phoneCode, setPhoneCode] = useState('+237');
+  const [phone,     setPhone]     = useState('');
+  const [skill,     setSkill]     = useState('');
+  const [imageUri,  setImageUri]  = useState<string | null>(null);
+
+  // UI state
+  const [modalType,  setModalType]  = useState<'region' | 'skill' | 'phone' | null>(null);
+  const [loading,    setLoading]    = useState(false);
+  const [uploading,  setUploading]  = useState(false);
+
+  // Load existing user data on mount
+  useEffect(() => {
+    const loadUser = async () => {
+      const stored = await AsyncStorage.getItem('user');
+      if (stored) {
+        const user = JSON.parse(stored);
+        setName(user.name         || '');
+        setEmail(user.email       || '');
+        setCity(user.city         || '');
+        setRegion(user.location   || '');
+        setSkill(user.category    || '');
+        setBio(user.bio || '');
+        setImageUri(user.profile_picture || null);
+        // Extract phone code and number if stored together
+        if (user.phone_number) {
+          const code = PHONE_CODES.find(c => user.phone_number.startsWith(c));
+          if (code) {
+            setPhoneCode(code);
+            setPhone(user.phone_number.replace(code, ''));
+          } else {
+            setPhone(user.phone_number);
+          }
+        }
+      }
+    };
+    loadUser();
+  }, []);
+
+  // Pick image from gallery
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alert('Permission denied to access media library!');
+      Alert.alert('Permission denied', 'We need access to your photos');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 1,
+      quality: 0.7,
     });
-
-    if (!result.cancelled) {
-      setImageUri(result.assets[0].uri);
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setImageUri(uri);
+      // Upload immediately after picking
+      try {
+        setUploading(true);
+        await uploadProfilePicture(uri);
+      } catch (err: any) {
+        Alert.alert('Upload failed', err.message);
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
-  const openModal = (type) => {
-    setModalType(type);
-    setModalVisible(true);
+  // Save profile
+  const handleSave = async () => {
+    if (!phone) {
+      Alert.alert('Error', 'Phone number is required');
+      return;
+    }
+    if (!region) {
+      Alert.alert('Error', 'Region is required');
+      return;
+    }
+    if (!city) {
+      Alert.alert('Error', 'City is required');
+      return;
+    }
+    if (!skill) {
+      Alert.alert('Error', 'Please select your skill');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await updateProfile({
+        name,
+        phone_number: `${phoneCode}${phone}`,
+        location:     region,
+        city,
+        category:     skill,
+        bio,  
+      });
+      router.push('/home');
+    } catch (err: any) {
+      Alert.alert('Update failed', err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onSelect = (item) => {
-    if (modalType === 'region') setRegion(item);
-    else if (modalType === 'skill') setSkill(item);
-    setModalVisible(false);
+  const modalData = () => {
+    if (modalType === 'region') return REGIONS.map(r => ({ id: r.code, label: r.name }));
+    if (modalType === 'skill')  return SKILLS.map(s => ({ id: s, label: s }));
+    if (modalType === 'phone')  return PHONE_CODES.map(c => ({ id: c, label: c }));
+    return [];
   };
 
-  const renderItem = ({ item }) => {
-    const selected = (modalType === 'region' ? region : skill) === item;
-    return (
-      <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
-        <View style={[styles.radioCircle, selected && styles.radioSelected]}>
-          {selected && <View style={styles.radioInner} />}
-        </View>
-        <Text style={styles.modalItemText}>{item}</Text>
-      </TouchableOpacity>
-    );
+  const onSelect = (item: { id: string; label: string }) => {
+    if (modalType === 'region') setRegion(item.id);
+    if (modalType === 'skill')  setSkill(item.id);
+    if (modalType === 'phone')  setPhoneCode(item.id);
+    setModalType(null);
   };
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#FF9D00" />
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FF9D00' }}>
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={{ flex: 1 }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={22} color="#111" />
+            </TouchableOpacity>
+            <Text style={styles.pageTitle}>Complete your Profile</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Avatar */}
+          <TouchableOpacity style={styles.avatarWrapper} onPress={pickImage}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={40} color="white" />
+              </View>
+            )}
+            <View style={styles.cameraBtn}>
+              {uploading
+                ? <ActivityIndicator size="small" color="white" />
+                : <Ionicons name="camera" size={16} color="white" />
+              }
+            </View>
+          </TouchableOpacity>
+          <Text style={styles.avatarHint}>Tap to upload photo</Text>
+
+          <View style={styles.form}>
+
+            {/* Name */}
+            <Text style={styles.label}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Full Name"
+              placeholderTextColor="#bbb"
+            />
+
+            {/* Email (read only) */}
+            <Text style={styles.label}>Email Address</Text>
+            <TextInput
+              style={[styles.input, styles.inputDisabled]}
+              value={email}
+              editable={false}
+              placeholder="Email address"
+              placeholderTextColor="#bbb"
+            />
+
+            {/* Region + Phone code */}
+            <View style={styles.row}>
+              <View style={{ flex: 1.2 }}>
+                <Text style={styles.label}>Region</Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setModalType('region')}
+                >
+                  <Text style={[styles.dropdownText, !region && { color: '#bbb' }]}>
+                    {region || 'Select region'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#999" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ width: 12 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Phone code</Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setModalType('phone')}
+                >
+                  <Text style={styles.dropdownText}>{phoneCode}</Text>
+                  <Ionicons name="chevron-down" size={16} color="#999" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Phone number */}
+            <Text style={styles.label}>Phone Number</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="6XXXXXXXX"
+              placeholderTextColor="#bbb"
+              keyboardType="phone-pad"
+            />
+
+            {/* City */}
+            <Text style={styles.label}>City</Text>
+            <TextInput
+              style={styles.input}
+              value={city}
+              onChangeText={setCity}
+              placeholder="Enter your city"
+              placeholderTextColor="#bbb"
+            />
+
+            {/* Age */}
+            <Text style={styles.label}>Age</Text>
+            <TextInput
+              style={styles.input}
+              value={age}
+              onChangeText={setAge}
+              placeholder="Your age"
+              placeholderTextColor="#bbb"
+              keyboardType="numeric"
+            />
+
+            {/* Bio */}
+              <Text style={styles.label}>Bio</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Tell people about yourself and your work..."
+                placeholderTextColor="#bbb"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+            {/* Skills */}
+            <Text style={styles.label}>Skills</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setModalType('skill')}
             >
-              <ScrollView contentContainerStyle={styles.container}>
-                <Text style={styles.title}>Set up your profile</Text>
+              <Text style={[styles.dropdownText, !skill && { color: '#bbb' }]}>
+                {skill || 'Select your skill'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#999" />
+            </TouchableOpacity>
 
-                <TouchableOpacity style={styles.imageContainer} onPress={pickImage}>
-                  {imageUri ? (
-                    <Image source={{ uri: imageUri }} style={styles.image} />
-                  ) : (
-                    <Text style={styles.addImageText}>Add an image</Text>
-                  )}
-                </TouchableOpacity>
+            {/* Save Button */}
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.saveBtnText}>Save & Continue</Text>
+              }
+            </TouchableOpacity>
 
-                <TouchableOpacity style={styles.dropdown} onPress={() => openModal('region')}>
-                  <Text style={region ? styles.dropdownText : styles.placeholderText}>
-                    {region || 'Region'}
-                  </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
-                </TouchableOpacity>
+          </View>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="City"
-                  placeholderTextColor="#999"
-                  value={city}
-                  onChangeText={setCity}
-                />
-
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  placeholder="Age"
-                  placeholderTextColor="#999"
-                  value={age}
-                  onChangeText={setAge}
-                />
-
-                <TouchableOpacity style={styles.dropdown} onPress={() => openModal('skill')}>
-                  <Text style={skill ? styles.dropdownText : styles.placeholderText}>
-                    {skill || 'Skills'}
-                  </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.input}
-                  keyboardType="phone-pad"
-                  placeholder="Phone number"
-                  placeholderTextColor="#999"
-                  value={phone}
-                  onChangeText={setPhone}
-                />
-
-                <TouchableOpacity style={styles.continueButton}>
-                  <Text style={styles.continueButtonText}>Continue</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </TouchableWithoutFeedback>
-        </View>
-      </SafeAreaView>
-
-      {/* Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* Selection Modal */}
+      <Modal visible={modalType !== null} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {modalType === 'region' ? 'Choose a region' : 'Choose a skill'}
+              {modalType === 'region' ? 'Select Region'
+               : modalType === 'skill' ? 'Select Skill'
+               : 'Phone Code'}
             </Text>
             <FlatList
-              data={modalType === 'region' ? REGIONS : SKILLS}
-              keyExtractor={(item) => item}
-              renderItem={renderItem}
+              data={modalData()}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.modalItem} onPress={() => onSelect(item)}>
+                  <Text style={styles.modalItemText}>{item.label}</Text>
+                </TouchableOpacity>
+              )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={styles.modalCloseButton}
-            >
-              <Text style={styles.modalCloseButtonText}>Cancel</Text>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalType(null)}>
+              <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -176,156 +344,60 @@ export default function ProfileSetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 40,
+  container:    { flex: 1, backgroundColor: '#fff' },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', paddingHorizontal: 16,
+    paddingTop: 50, paddingBottom: 8,
   },
-  title: {
-    fontSize: 22,
-    marginBottom: 25,
-    textAlign: 'center',
-    fontWeight: 'bold',
-    color: '#000',
+  backBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pageTitle:     { fontSize: 18, fontWeight: 'bold', color: '#111' },
+  avatarWrapper: { alignItems: 'center', marginTop: 16, marginBottom: 4 },
+  avatar:        { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#FF9D00' },
+  avatarPlaceholder: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: '#FF9D00', alignItems: 'center', justifyContent: 'center',
   },
-  imageContainer: {
-    width: 120,
-    height: 120,
-    backgroundColor: '#FF9D00',
-    borderRadius: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 25,
+  cameraBtn: {
+    position: 'absolute', bottom: 0, right: '35%',
+    backgroundColor: '#FF9D00', borderRadius: 12,
+    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'white',
   },
-  image: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  addImageText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  dropdown: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    marginBottom: 15,
-    fontSize: 16,
-    color: '#000',
-    backgroundColor: 'white',
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  placeholderText: {
-    color: '#999',
-    fontSize: 16,
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: '#000',
-  },
-  dropdownArrow: {
-    fontSize: 18,
-    color: '#999',
-  },
+  avatarHint:    { textAlign: 'center', color: '#999', fontSize: 12, marginBottom: 16 },
+  form:          { paddingHorizontal: 24, gap: 4 },
+  label:         { fontSize: 14, fontWeight: '600', color: '#222', marginBottom: 6, marginTop: 12 },
   input: {
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    marginBottom: 15,
-    fontSize: 16,
-    color: '#000',
-    backgroundColor: 'white',
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#222',
   },
-  continueButton: {
-    backgroundColor: '#FF9D00',
-    borderRadius: 8,
-    paddingVertical: 16,
-    marginTop: 10,
-    alignItems: 'center',
+  inputDisabled: { backgroundColor: '#F5F5F5', color: '#999' },
+  row:           { flexDirection: 'row', alignItems: 'flex-end' },
+  dropdown: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 12,
   },
-  continueButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  dropdownText:  { fontSize: 14, color: '#222' },
+  saveBtn: {
+    backgroundColor: '#FF9D00', borderRadius: 30,
+    paddingVertical: 16, alignItems: 'center', marginTop: 32,
+    shadowColor: '#FF9D00', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
+  saveBtnText:   { color: 'white', fontSize: 16, fontWeight: 'bold' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    maxHeight: '70%',
-    paddingVertical: 20,
-    paddingHorizontal: 15,
+    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    maxHeight: '60%', paddingVertical: 20, paddingHorizontal: 16,
   },
-  modalTitle: {
-    fontSize: 20,
-    marginBottom: 15,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  modalTitle:    { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 16 },
+  modalItem:     { paddingVertical: 14 },
+  modalItemText: { fontSize: 15, color: '#222' },
+  separator:     { height: 1, backgroundColor: '#F3F3F3' },
+  cancelBtn: {
+    marginTop: 12, alignItems: 'center', paddingVertical: 14,
+    borderWidth: 1, borderColor: '#FF9D00', borderRadius: 10,
   },
-  modalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  modalItemText: {
-    fontSize: 16,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#eee',
-  },
-  radioCircle: {
-    height: 20,
-    width: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#FF9D00',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  radioSelected: {
-    borderColor: '#FF9D00',
-  },
-  radioInner: {
-    height: 12,
-    width: 12,
-    borderRadius: 6,
-    backgroundColor: '#FF9D00',
-  },
-  modalCloseButton: {
-    marginTop: 15,
-    alignSelf: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#FF9D00',
-  },
-  modalCloseButtonText: {
-    color: '#FF9D00',
-    fontWeight: 'bold',
-  },
+  cancelText:    { color: '#FF9D00', fontWeight: '600', fontSize: 15 },
 });

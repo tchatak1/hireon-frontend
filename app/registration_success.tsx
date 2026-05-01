@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import React, { useRef, useEffect } from 'react';
 import {
   View,
@@ -41,7 +42,11 @@ const AnimatedImageScreen: React.FC = () => {
           <Text style={styles.congrats}>Congratulations</Text>
           <Text style={styles.message}>Your Account has been Successfully Created</Text>
           <TouchableOpacity style={styles.button}>
+          <Link href="/profile_setup">
+
             <Text style={styles.buttonText}>Continue</Text>
+          </Link>
+
           </TouchableOpacity>
         </View>
       </SafeAreaView>

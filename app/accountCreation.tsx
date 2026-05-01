@@ -49,7 +49,7 @@ const MyComponent = () => {
       await registerUser({
         name,
         email,
-        phone_number: '+237000000000', // will come from profile_setup later
+        phone_number: '00000', // will come from profile_setup later
         password,
       });
       router.push('/registration_success');
