@@ -7,8 +7,9 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateProfile, uploadProfilePicture } from '../utils/api';
+import { updateProfile, uploadProfilePicture, generateBioFromCV } from '../utils/api';
 
 const REGIONS = [
   { code: 'Adamaoua',   name: 'Adamaoua' },
@@ -29,7 +30,7 @@ const SKILLS = [
 
 const PHONE_CODES = ['+237', '+1', '+33', '+44', '+234'];
 
-export default function EditProfileScreen() {
+export default function ProfileSetupScreen() {
   const router = useRouter();
 
   // Form state
@@ -37,17 +38,22 @@ export default function EditProfileScreen() {
   const [email,     setEmail]     = useState('');
   const [city,      setCity]      = useState('');
   const [age,       setAge]       = useState('');
-  const [bio, setBio] = useState('');
+  const [bio,       setBio]       = useState('');
   const [region,    setRegion]    = useState('');
   const [phoneCode, setPhoneCode] = useState('+237');
   const [phone,     setPhone]     = useState('');
   const [skill,     setSkill]     = useState('');
   const [imageUri,  setImageUri]  = useState<string | null>(null);
 
+  // CV state
+  const [cvUri,         setCvUri]         = useState<string | null>(null);
+  const [cvName,        setCvName]        = useState<string | null>(null);
+  const [generatingBio, setGeneratingBio] = useState(false);
+
   // UI state
-  const [modalType,  setModalType]  = useState<'region' | 'skill' | 'phone' | null>(null);
-  const [loading,    setLoading]    = useState(false);
-  const [uploading,  setUploading]  = useState(false);
+  const [modalType, setModalType] = useState<'region' | 'skill' | 'phone' | null>(null);
+  const [loading,   setLoading]   = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Load existing user data on mount
   useEffect(() => {
@@ -55,14 +61,13 @@ export default function EditProfileScreen() {
       const stored = await AsyncStorage.getItem('user');
       if (stored) {
         const user = JSON.parse(stored);
-        setName(user.name         || '');
-        setEmail(user.email       || '');
-        setCity(user.city         || '');
-        setRegion(user.location   || '');
-        setSkill(user.category    || '');
-        setBio(user.bio || '');
+        setName(user.name      || '');
+        setEmail(user.email    || '');
+        setCity(user.city      || '');
+        setBio(user.bio        || '');
+        setRegion(user.location || '');
+        setSkill(user.category  || '');
         setImageUri(user.profile_picture || null);
-        // Extract phone code and number if stored together
         if (user.phone_number) {
           const code = PHONE_CODES.find(c => user.phone_number.startsWith(c));
           if (code) {
@@ -77,7 +82,7 @@ export default function EditProfileScreen() {
     loadUser();
   }, []);
 
-  // Pick image from gallery
+  // ── Pick profile image ────────────────────────────────────────
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -93,7 +98,6 @@ export default function EditProfileScreen() {
     if (!result.canceled) {
       const uri = result.assets[0].uri;
       setImageUri(uri);
-      // Upload immediately after picking
       try {
         setUploading(true);
         await uploadProfilePicture(uri);
@@ -105,24 +109,39 @@ export default function EditProfileScreen() {
     }
   };
 
-  // Save profile
+  // ── Pick CV and auto-generate bio ─────────────────────────────
+  const pickCV = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+
+      const file = result.assets[0];
+      setCvUri(file.uri);
+      setCvName(file.name);
+
+      setGeneratingBio(true);
+      try {
+        const generatedBio = await generateBioFromCV(file.uri);
+        setBio(generatedBio);
+      } catch (err: any) {
+        Alert.alert('Bio generation failed', err.message);
+      } finally {
+        setGeneratingBio(false);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open file picker');
+    }
+  };
+
+  // ── Save profile ──────────────────────────────────────────────
   const handleSave = async () => {
-    if (!phone) {
-      Alert.alert('Error', 'Phone number is required');
-      return;
-    }
-    if (!region) {
-      Alert.alert('Error', 'Region is required');
-      return;
-    }
-    if (!city) {
-      Alert.alert('Error', 'City is required');
-      return;
-    }
-    if (!skill) {
-      Alert.alert('Error', 'Please select your skill');
-      return;
-    }
+    if (!phone)  { Alert.alert('Error', 'Phone number is required'); return; }
+    if (!region) { Alert.alert('Error', 'Region is required');       return; }
+    if (!city)   { Alert.alert('Error', 'City is required');         return; }
+    if (!skill)  { Alert.alert('Error', 'Please select your skill'); return; }
 
     try {
       setLoading(true);
@@ -132,7 +151,7 @@ export default function EditProfileScreen() {
         location:     region,
         city,
         category:     skill,
-        bio,  
+        bio,
       });
       router.push('/home');
     } catch (err: any) {
@@ -272,19 +291,6 @@ export default function EditProfileScreen() {
               keyboardType="numeric"
             />
 
-            {/* Bio */}
-              <Text style={styles.label}>Bio</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={bio}
-                onChangeText={setBio}
-                placeholder="Tell people about yourself and your work..."
-                placeholderTextColor="#bbb"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-
             {/* Skills */}
             <Text style={styles.label}>Skills</Text>
             <TouchableOpacity
@@ -297,11 +303,52 @@ export default function EditProfileScreen() {
               <Ionicons name="chevron-down" size={16} color="#999" />
             </TouchableOpacity>
 
+            {/* CV Upload */}
+            <Text style={styles.label}>Upload your CV (PDF)</Text>
+            <TouchableOpacity style={styles.cvUploadBtn} onPress={pickCV}>
+              <Ionicons
+                name={cvUri ? 'document-text' : 'cloud-upload-outline'}
+                size={22}
+                color={cvUri ? '#FF9D00' : '#999'}
+              />
+              <Text style={[styles.cvUploadText, cvUri && { color: '#FF9D00' }]}>
+                {cvName || 'Tap to select PDF'}
+              </Text>
+              {cvUri && <Ionicons name="checkmark-circle" size={18} color="#27AE60" />}
+            </TouchableOpacity>
+
+            {/* Bio */}
+            <Text style={styles.label}>
+              Bio
+              {generatingBio && (
+                <Text style={{ color: '#FF9D00', fontSize: 12 }}> — Generating...</Text>
+              )}
+            </Text>
+            {generatingBio ? (
+              <View style={styles.generatingBox}>
+                <ActivityIndicator color="#FF9D00" />
+                <Text style={styles.generatingText}>
+                  Reading your CV and generating bio...
+                </Text>
+              </View>
+            ) : (
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Upload your CV above to auto-generate, or type manually..."
+                placeholderTextColor="#bbb"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            )}
+
             {/* Save Button */}
             <TouchableOpacity
               style={styles.saveBtn}
               onPress={handleSave}
-              disabled={loading}
+              disabled={loading || generatingBio}
             >
               {loading
                 ? <ActivityIndicator color="white" />
@@ -372,6 +419,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#222',
   },
   inputDisabled: { backgroundColor: '#F5F5F5', color: '#999' },
+  textArea:      { height: 100, paddingTop: 12 },
   row:           { flexDirection: 'row', alignItems: 'flex-end' },
   dropdown: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -379,6 +427,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12,
   },
   dropdownText:  { fontSize: 14, color: '#222' },
+  cvUploadBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 8,
+    borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 14,
+    gap: 10, backgroundColor: '#FAFAFA',
+  },
+  cvUploadText:  { flex: 1, fontSize: 14, color: '#999' },
+  generatingBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1, borderColor: '#FFE0A0', borderRadius: 8,
+    padding: 14, backgroundColor: '#FFF8EE',
+  },
+  generatingText: { fontSize: 13, color: '#FF9D00', flex: 1 },
   saveBtn: {
     backgroundColor: '#FF9D00', borderRadius: 30,
     paddingVertical: 16, alignItems: 'center', marginTop: 32,

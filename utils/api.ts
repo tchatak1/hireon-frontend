@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ⚠️ Replace with your actual IPv4 address from ipconfig
-const BASE_URL = 'http://192.168.1.95:8000';
+const BASE_URL = 'http://192.168.1.94:8000';
 
 // ── Register ──────────────────────────────────────────────────────
 export const registerUser = async (userData: {
@@ -121,4 +121,28 @@ export const getAllUsers = async (filters?: {
 export const logoutUser = async () => {
   await AsyncStorage.removeItem('access_token');
   await AsyncStorage.removeItem('user');
+};
+
+// ── Generate bio from CV ──────────────────────────────────────────
+export const generateBioFromCV = async (pdfUri: string): Promise<string> => {
+  const token = await AsyncStorage.getItem('access_token');
+
+  const formData = new FormData();
+  const filename = pdfUri.split('/').pop() || 'cv.pdf';
+
+  formData.append('file', {
+    uri:  pdfUri,
+    name: filename,
+    type: 'application/pdf',
+  } as any);
+
+  const response = await fetch(`${BASE_URL}/bio/generate`, {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body:    formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Bio generation failed');
+  return data.bio;
 };
