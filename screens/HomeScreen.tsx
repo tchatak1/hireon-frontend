@@ -88,14 +88,14 @@ export default function HomeScreen() {
     : [];
 
   const toCard = (user: any) => ({
-    id:       user.user_id,
-    name:     user.name,
-    location: user.city || user.location || 'Cameroon',
-    rating:   null,
-    image:    user.profile_picture
-                ? { uri: user.profile_picture }
-                : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' },
-  });
+  id:       user.user_id,
+  name:     user.name,
+  location: user.city || user.location || 'Cameroon',
+  rating:   user.average_rating || null,
+  image:    user.profile_picture
+              ? { uri: user.profile_picture }
+              : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' },
+});
 
   return (
     <ScrollView
