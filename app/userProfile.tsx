@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Image, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert, Modal,
-  TextInput, StatusBar,
+  TextInput, StatusBar, KeyboardAvoidingView,
+  Platform, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,9 +27,11 @@ export default function UserProfileScreen() {
   const [submitting,    setSubmitting]    = useState(false);
   const [completing,    setCompleting]    = useState(false);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  // Fix #3: track completion & review locally so buttons disappear immediately
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
+
+  useEffect(() => { fetchProfile(); }, []);
 
   const fetchProfile = async () => {
     try {
@@ -53,6 +56,8 @@ export default function UserProfileScreen() {
             try {
               setCompleting(true);
               await markJobCompleted(request_id!);
+              // Fix #3: hide complete button, make rate button appear
+              setIsCompleted(true);
               Alert.alert(
                 '✅ Job Completed',
                 'The job has been marked as completed. You can now rate the provider.',
@@ -74,21 +79,36 @@ export default function UserProfileScreen() {
       Alert.alert('Error', 'Please select a star rating');
       return;
     }
+    // Fix #2: guard against double-tap
+    if (submitting) return;
+
+    setSubmitting(true);
     try {
-      setSubmitting(true);
       await submitReview({
         request_id: request_id!,
         rating:     selectedStars,
         comment:    comment.trim() || undefined,
       });
-      setShowRating(false);
-      Alert.alert('✅ Review Submitted', 'Thank you for your feedback!');
-      fetchProfile(); // refresh to show new rating
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    } finally {
+      // Fix #2: set false BEFORE closing modal — avoids dropped state update
       setSubmitting(false);
+      setShowRating(false);
+      setSelectedStars(0);
+      setComment('');
+      // Fix #3: hide rate button after successful review
+      setHasReviewed(true);
+      Alert.alert('✅ Review Submitted', 'Thank you for your feedback!');
+      fetchProfile();
+    } catch (err: any) {
+      setSubmitting(false);
+      Alert.alert('Error', err.message || 'Failed to submit review');
     }
+  };
+
+  const closeRatingModal = () => {
+    Keyboard.dismiss();
+    setShowRating(false);
+    setSelectedStars(0);
+    setComment('');
   };
 
   const renderStars = (rating: number, size = 16, interactive = false) => (
@@ -126,6 +146,10 @@ export default function UserProfileScreen() {
     );
   }
 
+  // Fix #3: compute visibility from local state + route params
+  const showCompleteBtn = can_complete === 'true' && !isCompleted;
+  const showRateBtn     = (can_rate === 'true' || isCompleted) && !hasReviewed;
+
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#FF9D00" />
@@ -154,7 +178,6 @@ export default function UserProfileScreen() {
               />
               <Text style={styles.name}>{profile.name}</Text>
 
-              {/* Skill + Availability */}
               <View style={styles.badgeRow}>
                 {profile.category && (
                   <View style={styles.skillBadge}>
@@ -178,7 +201,6 @@ export default function UserProfileScreen() {
                 </View>
               </View>
 
-              {/* Location */}
               {profile.city && (
                 <View style={styles.locationRow}>
                   <Ionicons name="location-sharp" size={14} color="#FF9D00" />
@@ -188,13 +210,10 @@ export default function UserProfileScreen() {
                 </View>
               )}
 
-              {/* Rating summary */}
               <View style={styles.ratingRow}>
                 {renderStars(Math.round(profile.average_rating || 0))}
                 <Text style={styles.ratingText}>
-                  {profile.average_rating
-                    ? `${profile.average_rating} / 5`
-                    : 'No ratings yet'}
+                  {profile.average_rating ? `${profile.average_rating} / 5` : 'No ratings yet'}
                 </Text>
                 <Text style={styles.reviewCount}>
                   ({profile.total_reviews} review{profile.total_reviews !== 1 ? 's' : ''})
@@ -202,7 +221,6 @@ export default function UserProfileScreen() {
               </View>
             </View>
 
-            {/* Bio */}
             {profile.bio && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>About</Text>
@@ -212,8 +230,7 @@ export default function UserProfileScreen() {
 
             {/* Action Buttons */}
             <View style={styles.actionRow}>
-              {/* Mark Completed button */}
-              {can_complete === 'true' && (
+              {showCompleteBtn && (
                 <TouchableOpacity
                   style={styles.completeBtn}
                   onPress={handleMarkCompleted}
@@ -229,8 +246,7 @@ export default function UserProfileScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* Rate button */}
-              {can_rate === 'true' && (
+              {showRateBtn && (
                 <TouchableOpacity
                   style={styles.rateBtn}
                   onPress={() => setShowRating(true)}
@@ -240,7 +256,6 @@ export default function UserProfileScreen() {
                 </TouchableOpacity>
               )}
 
-              {/* Hire button */}
               <TouchableOpacity
                 style={styles.hireBtn}
                 onPress={() => router.push({
@@ -255,9 +270,7 @@ export default function UserProfileScreen() {
 
             {/* Reviews */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Reviews ({profile.total_reviews})
-              </Text>
+              <Text style={styles.sectionTitle}>Reviews ({profile.total_reviews})</Text>
               {profile.reviews.length === 0 ? (
                 <Text style={styles.noReviews}>No reviews yet</Text>
               ) : (
@@ -292,58 +305,64 @@ export default function UserProfileScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Rating Modal */}
+      {/* Fix #1: Rating Modal with KeyboardAvoidingView */}
       <Modal visible={showRating} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Rate {profile.name}</Text>
-            <Text style={styles.modalSubtitle}>How was your experience?</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+          >
+            {/* Tap dark area above sheet to dismiss keyboard without closing modal */}
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={{ flex: 1 }} />
+            </TouchableWithoutFeedback>
 
-            {/* Stars */}
-            <View style={styles.starsRow}>
-              {renderStars(selectedStars, 40, true)}
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Rate {profile.name}</Text>
+              <Text style={styles.modalSubtitle}>How was your experience?</Text>
+
+              <View style={styles.starsRow}>
+                {renderStars(selectedStars, 40, true)}
+              </View>
+              <Text style={styles.starLabel}>
+                {selectedStars === 0 ? 'Tap to rate'
+                 : selectedStars === 1 ? 'Poor'
+                 : selectedStars === 2 ? 'Fair'
+                 : selectedStars === 3 ? 'Good'
+                 : selectedStars === 4 ? 'Very Good'
+                 : 'Excellent!'}
+              </Text>
+
+              <TextInput
+                style={styles.commentInput}
+                value={comment}
+                onChangeText={setComment}
+                placeholder="Leave a comment (optional)..."
+                placeholderTextColor="#bbb"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                blurOnSubmit
+                returnKeyType="done"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={closeRatingModal}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+                  onPress={handleSubmitReview}
+                  disabled={submitting}
+                >
+                  {submitting
+                    ? <ActivityIndicator color="white" size="small" />
+                    : <Text style={styles.submitBtnText}>Submit</Text>
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.starLabel}>
-              {selectedStars === 0 ? 'Tap to rate'
-               : selectedStars === 1 ? 'Poor'
-               : selectedStars === 2 ? 'Fair'
-               : selectedStars === 3 ? 'Good'
-               : selectedStars === 4 ? 'Very Good'
-               : 'Excellent!'}
-            </Text>
-
-            {/* Comment */}
-            <TextInput
-              style={styles.commentInput}
-              value={comment}
-              onChangeText={setComment}
-              placeholder="Leave a comment (optional)..."
-              placeholderTextColor="#bbb"
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            {/* Buttons */}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => { setShowRating(false); setSelectedStars(0); setComment(''); }}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.submitBtn}
-                onPress={handleSubmitReview}
-                disabled={submitting}
-              >
-                {submitting
-                  ? <ActivityIndicator color="white" size="small" />
-                  : <Text style={styles.submitBtnText}>Submit</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </>
@@ -353,8 +372,7 @@ export default function UserProfileScreen() {
 const styles = StyleSheet.create({
   loadingBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 16,
     borderBottomWidth: 1, borderBottomColor: '#F3F3F3',
   },
@@ -421,10 +439,13 @@ const styles = StyleSheet.create({
   reviewerAvatar: { width: 36, height: 36, borderRadius: 18 },
   reviewerName:   { fontSize: 13, fontWeight: '600', color: '#222', marginBottom: 3 },
   reviewComment:  { fontSize: 13, color: '#555', lineHeight: 18 },
-  modalBackdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  // Modal
+  modalBackdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
   },
   modalTitle:     { fontSize: 20, fontWeight: 'bold', color: '#111', textAlign: 'center', marginBottom: 4 },
   modalSubtitle:  { fontSize: 14, color: '#999', textAlign: 'center', marginBottom: 20 },

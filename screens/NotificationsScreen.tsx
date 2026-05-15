@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +10,8 @@ import {
   RefreshControl,
   Linking,
   Alert,
+  Animated,
+  PanResponder,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +24,95 @@ import {
   markNotificationRead,
 } from '../utils/api';
 
-export default function NotificationsScreen() {
+// ── Swipeable row ─────────────────────────────────────────────────
+function SwipeableRow({
+  children,
+  onSwipeRight,
+  disabled = false,
+}: {
+  children: React.ReactNode;
+  onSwipeRight: () => void;
+  disabled?: boolean;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const THRESHOLD  = 80;
+  const MAX_DRAG   = 110;
+
+  const snapBack = () =>
+    Animated.spring(translateX, {
+      toValue:       0,
+      useNativeDriver: false,
+      tension:       120,
+      friction:      10,
+    }).start();
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // Claim horizontal swipes only
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        !disabled && Math.abs(dx) > Math.abs(dy) && dx > 5,
+      onPanResponderGrant: () => {
+        // Stop any ongoing animation so finger takes full control
+        translateX.stopAnimation();
+      },
+      // Card follows finger in real time
+      onPanResponderMove: (_, { dx }) => {
+        translateX.setValue(Math.max(0, Math.min(dx, MAX_DRAG)));
+      },
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx >= THRESHOLD) onSwipeRight();
+        snapBack(); // always return to origin
+      },
+      onPanResponderTerminate: () => snapBack(),
+    })
+  ).current;
+
+  // Fade-in the action label as the card moves
+  const actionOpacity = translateX.interpolate({
+    inputRange:  [20, 70],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={swipeStyles.container}>
+      {/* Green action — fixed on the left, revealed as card slides right */}
+      <Animated.View style={[swipeStyles.action, { opacity: actionOpacity }]}>
+        <Ionicons name="checkmark-done" size={18} color="#fff" />
+        <Text style={swipeStyles.actionText}>Mark as read</Text>
+      </Animated.View>
+
+      {/* Card slides right */}
+      <Animated.View
+        {...(disabled ? {} : panResponder.panHandlers)}
+        style={{ transform: [{ translateX }] }}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+const swipeStyles = StyleSheet.create({
+  container: {
+    overflow: 'hidden',
+  },
+  action: {
+    position:       'absolute',
+    left:           12,
+    top:            6,
+    bottom:         6,
+    width:          100,
+    backgroundColor:'#27AE60',
+    borderRadius:   12,
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            4,
+  },
+  actionText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+});
+
+export default function NotificationsScreen({ onUnreadChange }: { onUnreadChange?: (count: number) => void }) {
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -35,6 +124,7 @@ export default function NotificationsScreen() {
     try {
       const data = await getNotifications();
       setNotifications(data);
+      onUnreadChange?.(data.filter((n: any) => !n.is_read).length);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
     } finally {
@@ -149,6 +239,20 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Relative time: "2 mins ago", "3 hours ago", "Yesterday", etc.
+  const getRelativeTime = (dateStr: string | undefined): string => {
+    if (!dateStr) return 'Just now';
+    const diffMs   = Date.now() - new Date(dateStr).getTime();
+    const diffMins = Math.floor(diffMs / 60_000);
+    if (diffMins < 1)   return 'Just now';
+    if (diffMins < 60)  return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays  = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
+  };
+
   // Check if notification is today
   const isToday = (dateStr: string) => {
     const today = new Date().toDateString();
@@ -176,6 +280,23 @@ export default function NotificationsScreen() {
       )
   );
 
+  // Swipe right to mark as read
+  const handleSwipeMarkRead = async (item: any) => {
+    if (item.is_read) return;
+    try {
+      await markNotificationRead(item.notification_id);
+      setNotifications(prev => {
+        const updated = prev.map(n =>
+          n.notification_id === item.notification_id ? { ...n, is_read: true } : n
+        );
+        onUnreadChange?.(updated.filter(n => !n.is_read).length);
+        return updated;
+      });
+    } catch (err) {
+      console.error('Mark read failed:', err);
+    }
+  };
+
   // Render notification
   const renderNotification = ({
     item,
@@ -189,7 +310,11 @@ export default function NotificationsScreen() {
       item.request?.status === 'pending';
 
     return (
-      <TouchableOpacity
+      <SwipeableRow
+        onSwipeRight={() => handleSwipeMarkRead(item)}
+        disabled={item.is_read}
+      >
+        <TouchableOpacity
         activeOpacity={0.9}
         onPress={() =>
           handleViewProfile(item)
@@ -248,14 +373,7 @@ export default function NotificationsScreen() {
               )}
 
               <Text style={styles.notifTime}>
-                {item.created_at
-                  ? new Date(
-                      item.created_at
-                    ).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : 'Just now'}
+                {getRelativeTime(item.created_at)}
               </Text>
             </View>
 
@@ -328,10 +446,11 @@ export default function NotificationsScreen() {
             </View>
           )}
 
-          {/* Accepted request */}
+          {/* Accepted request — only show if job not yet completed */}
           {item.type ===
             'request_accepted' &&
-            item.request && (
+            item.request &&
+            item.request.status !== 'completed' && (
               <View
                 style={styles.actionRow}
               >
@@ -414,6 +533,7 @@ export default function NotificationsScreen() {
             )}
         </View>
       </TouchableOpacity>
+      </SwipeableRow>
     );
   };
 
@@ -537,10 +657,7 @@ export default function NotificationsScreen() {
                             item.notification_id
                           }
                         >
-                          {renderNotification(
-                            {
-                              item,
-                            }
+                          {renderNotification({item, }
                           )}
                         </View>
                       )
@@ -595,10 +712,8 @@ const styles = StyleSheet.create({
   notifCard: {
     marginHorizontal: 12,
     marginVertical: 6,
-
     backgroundColor: '#FFF8EE',
     borderRadius: 12,
-
     padding: 12,
   },
 
@@ -744,8 +859,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#999',
   },
- 
-
-
-
 });

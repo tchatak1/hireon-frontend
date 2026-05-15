@@ -264,7 +264,7 @@ export const submitReview = async (data: {
   comment?:   string;
 }) => {
   const headers  = await postAuthHeaders();
-  const response = await fetch(`${BASE_URL}/reviews`, {
+  const response = await fetch(`${BASE_URL}/reviews/`, {
     method: 'POST',
     headers,
     body:   JSON.stringify(data),
