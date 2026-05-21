@@ -17,10 +17,9 @@ const TABS = [
 ];
 
 export default function MainApp() {
-  const [activeTab,    setActiveTab]    = useState('Home');
-  const [unreadCount,  setUnreadCount]  = useState(0);
+  const [activeTab,   setActiveTab]   = useState('Home');
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Fetch unread count on mount and whenever we switch back to the app
   const refreshUnread = useCallback(async () => {
     try {
       const data = await getNotifications();
@@ -30,7 +29,6 @@ export default function MainApp() {
 
   useEffect(() => { refreshUnread(); }, []);
 
-  // Re-count when user navigates away from Notifications tab
   useEffect(() => {
     if (activeTab !== 'Notifications') refreshUnread();
   }, [activeTab]);
@@ -67,17 +65,14 @@ export default function MainApp() {
                   onPress={() => setActiveTab(tab.key)}
                   activeOpacity={0.7}
                 >
-                  {/* Active pill indicator */}
                   {isActive && <View style={styles.activePill} />}
 
-                  {/* Icon + badge wrapper */}
                   <View style={{ position: 'relative' }}>
                     <Ionicons
                       name={(isActive ? tab.icon : tab.iconOut) as any}
                       size={24}
                       color={isActive ? '#FF9D00' : '#BDBDBD'}
                     />
-                    {/* Unread badge on Notifications icon */}
                     {isNotif && unreadCount > 0 && (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>
@@ -111,7 +106,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     alignItems: 'center',
-    // subtle shadow above bar
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.06,

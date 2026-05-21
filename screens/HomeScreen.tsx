@@ -6,7 +6,7 @@ import {
   Dimensions, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getAllUsers } from '../utils/api';
+import { getAllUsers, getRecommendations } from '../utils/api';
 import { ProfessionalCard } from '../components/ProfessionalCard';
 
 const { width } = Dimensions.get('window');
@@ -34,7 +34,9 @@ const SKILL_MAP: Record<string, string> = {
 export default function HomeScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [allUsers,    setAllUsers]    = useState<any[]>([]);
+  const [recommended, setRecommended] = useState<any[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [loadingRec,  setLoadingRec]  = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,11 +57,30 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  const fetchRecommendations = async () => {
+    try {
+      setLoadingRec(true);
+      const recs = await getRecommendations({ limit: 10 });
+      setRecommended(recs);
+    } catch (err) {
+      console.warn('Recommendations unavailable:', err);
+      setRecommended([]);
+    } finally {
+      setLoadingRec(false);
+    }
+  };
 
-  const onRefresh = () => { setRefreshing(true); fetchUsers(); };
+  useEffect(() => {
+    fetchUsers();
+    fetchRecommendations();
+  }, []);
 
-  // Fires when user manually swipes the hero carousel
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchUsers();
+    fetchRecommendations();
+  };
+
   const onHeroScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
     if (index >= 0 && index < SKILLS.length && index !== activeIndex) {
@@ -68,7 +89,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Fires when user taps a skill chip — updates everything immediately
   const onSkillPress = (index: number) => {
     setActiveIndex(index);
     heroScrollRef.current?.scrollTo({ x: index * width, animated: true });
@@ -88,14 +108,15 @@ export default function HomeScreen() {
     : [];
 
   const toCard = (user: any) => ({
-  id:       user.user_id,
-  name:     user.name,
-  location: user.city || user.location || 'Cameroon',
-  rating:   user.average_rating || null,
-  image:    user.profile_picture
-              ? { uri: user.profile_picture }
-              : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' },
-});
+    id:       user.user_id,
+    name:     user.name,
+    location: user.city || user.location || 'Cameroon',
+    rating:   user.average_rating || null,
+    category: user.category || null,
+    image:    user.profile_picture
+                ? { uri: user.profile_picture }
+                : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' },
+  });
 
   return (
     <ScrollView
@@ -105,7 +126,7 @@ export default function HomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF9D00']} />
       }
     >
-      {/* ── Hero Carousel ───────────────────────────────────── */}
+      {/* ── Hero Carousel ─────────────────────────────────── */}
       <View style={styles.heroContainer}>
         <ScrollView
           ref={heroScrollRef}
@@ -147,18 +168,14 @@ export default function HomeScreen() {
         {/* Dots */}
         <View style={styles.heroDots}>
           {SKILLS.map((_, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => onSkillPress(i)}
-              activeOpacity={1}
-            >
+            <TouchableOpacity key={i} onPress={() => onSkillPress(i)} activeOpacity={1}>
               <View style={[styles.dot, i === activeIndex && styles.dotActive]} />
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* ── Search Results ───────────────────────────────────── */}
+      {/* ── Search Results ─────────────────────────────────── */}
       {searchQuery.trim().length > 0 && (
         <View style={{ paddingTop: 8 }}>
           <View style={styles.sectionHeader}>
@@ -182,9 +199,46 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ── Skill Chips + Content ────────────────────────────── */}
+      {/* ── Main content ───────────────────────────────────── */}
       {searchQuery.trim().length === 0 && (
         <>
+          {/* ── Recommended for You ──────────────────────── */}
+          {(loadingRec || recommended.length > 0) && (
+            <>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleRow}>
+                  <Ionicons name="star" size={16} color="#FF9D00" style={{ marginRight: 6 }} />
+                  <Text style={styles.sectionTitle}>Recommended for You</Text>
+                </View>
+              </View>
+              {loadingRec ? (
+                <View style={styles.recLoadingBox}>
+                  <ActivityIndicator size="small" color="#FF9D00" />
+                </View>
+              ) : (
+                <FlatList
+                  data={recommended.map(toCard)}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.cardList}
+                  renderItem={({ item }) => (
+                    <View>
+                      <ProfessionalCard item={item} />
+                      {item.category && (
+                        <View style={styles.categoryBadge}>
+                          <Text style={styles.categoryBadgeText}>{item.category}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                />
+              )}
+              <View style={styles.divider} />
+            </>
+          )}
+
+          {/* ── Skill Chips ──────────────────────────────── */}
           <ScrollView
             ref={skillScrollRef}
             horizontal
@@ -200,10 +254,7 @@ export default function HomeScreen() {
                   onPress={() => onSkillPress(index)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[
-                    styles.skillChipText,
-                    isActive && styles.skillChipTextActive,
-                  ]}>
+                  <Text style={[styles.skillChipText, isActive && styles.skillChipTextActive]}>
                     {skill}
                   </Text>
                 </TouchableOpacity>
@@ -271,10 +322,10 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenContainer:   { flex: 1, backgroundColor: '#fff' },
-  heroContainer:     { width: '100%', height: 220, position: 'relative' },
-  heroSlide:         { width, height: 220, position: 'relative' },
-  heroImage:         { width: '100%', height: '100%', resizeMode: 'cover' },
+  screenContainer: { flex: 1, backgroundColor: '#fff' },
+  heroContainer:   { width: '100%', height: 220, position: 'relative' },
+  heroSlide:       { width, height: 220, position: 'relative' },
+  heroImage:       { width: '100%', height: '100%', resizeMode: 'cover' },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.25)',
@@ -294,15 +345,22 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
   },
-  searchInput:       { flex: 1, fontSize: 13, color: '#333' },
+  searchInput: { flex: 1, fontSize: 13, color: '#333' },
   heroDots: {
     position: 'absolute', bottom: 12,
     width: '100%', flexDirection: 'row',
     justifyContent: 'center', gap: 6,
   },
-  dot:               { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotActive:         { backgroundColor: '#FF9D00', width: 22, borderRadius: 4 },
-  skillsRow:         { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  dot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotActive: { backgroundColor: '#FF9D00', width: 22, borderRadius: 4 },
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', paddingHorizontal: 16, marginBottom: 10, marginTop: 16,
+  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  sectionTitle:    { fontSize: 16, fontWeight: 'bold', color: '#111' },
+  seeAll:          { fontSize: 13, color: '#FF9D00', fontWeight: '600' },
+  skillsRow:       { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   skillChip: {
     paddingHorizontal: 16, paddingVertical: 8,
     borderRadius: 20, borderWidth: 1.5,
@@ -311,14 +369,16 @@ const styles = StyleSheet.create({
   skillChipActive:     { backgroundColor: '#FF9D00' },
   skillChipText:       { fontSize: 13, fontWeight: '600', color: '#FF9D00' },
   skillChipTextActive: { color: 'white' },
-  sectionHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 16, marginBottom: 10,
+  cardList:       { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
+  loadingBox:     { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  recLoadingBox:  { alignItems: 'center', paddingVertical: 20 },
+  loadingText:    { color: '#999', fontSize: 14 },
+  emptyText:      { color: '#999', fontSize: 13, paddingHorizontal: 16, paddingBottom: 16 },
+  divider:        { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 16, marginTop: 8 },
+  categoryBadge: {
+    alignSelf: 'flex-start', marginLeft: 4, marginTop: 4,
+    backgroundColor: '#FFF3E0', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 2,
   },
-  sectionTitle:  { fontSize: 16, fontWeight: 'bold', color: '#111' },
-  seeAll:        { fontSize: 13, color: '#FF9D00', fontWeight: '600' },
-  cardList:      { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
-  loadingBox:    { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  loadingText:   { color: '#999', fontSize: 14 },
-  emptyText:     { color: '#999', fontSize: 13, paddingHorizontal: 16, paddingBottom: 16 },
+  categoryBadgeText: { fontSize: 10, color: '#FF9D00', fontWeight: '600' },
 });

@@ -273,3 +273,23 @@ export const submitReview = async (data: {
   if (!response.ok) throw new Error(result.detail || 'Failed to submit review');
   return result;
 };
+// ── Get recommendations ───────────────────────────────────────────
+export const getRecommendations = async (params?: {
+  category?: string;
+  lat?: number;
+  lon?: number;
+  limit?: number;
+}) => {
+  const headers = await getAuthHeaders();
+  const query   = new URLSearchParams();
+  if (params?.category) query.append('category', params.category);
+  if (params?.lat)      query.append('lat',      String(params.lat));
+  if (params?.lon)      query.append('lon',      String(params.lon));
+  if (params?.limit)    query.append('limit',    String(params.limit));
+
+  const url      = `${BASE_URL}/recommendations${query.toString() ? '?' + query.toString() : ''}`;
+  const response = await fetch(url, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to get recommendations');
+  return data;
+};
