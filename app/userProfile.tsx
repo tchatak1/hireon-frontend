@@ -8,7 +8,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getUserProfile, submitReview, markJobCompleted } from '../utils/api';
+import { getUserProfile, submitReview, markJobCompleted, getOrCreateConversation } from '../utils/api';
 
 export default function UserProfileScreen() {
   const router = useRouter();
@@ -26,6 +26,7 @@ export default function UserProfileScreen() {
   const [comment,       setComment]       = useState('');
   const [submitting,    setSubmitting]    = useState(false);
   const [completing,    setCompleting]    = useState(false);
+  const [messaging,     setMessaging]     = useState(false);
 
   // Fix #3: track completion & review locally so buttons disappear immediately
   const [isCompleted, setIsCompleted] = useState(false);
@@ -109,6 +110,27 @@ export default function UserProfileScreen() {
     setShowRating(false);
     setSelectedStars(0);
     setComment('');
+  };
+
+  const handleMessage = async () => {
+    if (messaging) return;
+    setMessaging(true);
+    try {
+      const conv = await getOrCreateConversation(user_id);
+      router.push({
+        pathname: '/chatScreen',
+        params: {
+          conversation_id: conv.conversation_id,
+          other_user_id:   user_id,
+          other_name:      profile?.name || 'User',
+          other_image:     profile?.profile_picture || '',
+        },
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not open chat');
+    } finally {
+      setMessaging(false);
+    }
   };
 
   const renderStars = (rating: number, size = 16, interactive = false) => (
@@ -255,6 +277,18 @@ export default function UserProfileScreen() {
                   <Text style={styles.rateBtnText}>Rate</Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={styles.messageBtn}
+                onPress={handleMessage}
+                disabled={messaging}
+              >
+                {messaging
+                  ? <ActivityIndicator size="small" color="#FF9D00" />
+                  : <Ionicons name="chatbubble-outline" size={18} color="#FF9D00" />
+                }
+                <Text style={styles.messageBtnText}>Message</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.hireBtn}
@@ -409,6 +443,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 16,
     borderTopWidth: 1, borderTopColor: '#F3F3F3',
   },
+  messageBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 10, paddingHorizontal: 18,
+    borderRadius: 10, borderWidth: 1.5, borderColor: '#FF9D00',
+    backgroundColor: '#fff',
+  },
+  messageBtnText: { color: '#FF9D00', fontWeight: 'bold', fontSize: 14 },
   hireBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 6,

@@ -293,3 +293,40 @@ export const getRecommendations = async (params?: {
   if (!response.ok) throw new Error(data.detail || 'Failed to get recommendations');
   return data;
 };
+
+// ── Chat ──────────────────────────────────────────────────────────
+export const getOrCreateConversation = async (otherUserId: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/chat/conversations/${otherUserId}`, { method: 'POST', headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to open conversation');
+  return data;
+};
+
+export const getConversations = async () => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/chat/conversations`, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to load conversations');
+  return data;
+};
+
+export const getMessages = async (conversationId: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/chat/conversations/${conversationId}/messages`, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to load messages');
+  return data;
+};
+
+export const sendMessage = async (conversationId: string, content: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/chat/conversations/${conversationId}/messages`, {
+    method:  'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ content }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to send message');
+  return data;
+};
