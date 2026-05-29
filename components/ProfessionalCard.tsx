@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { getOrCreateConversation } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.55;
@@ -29,92 +31,70 @@ interface Props {
 
 export const ProfessionalCard = ({ item }: Props) => {
   const router = useRouter();
+  const { t } = useLanguage();
 
-  // Navigate to hire form
   const handleHire = () => {
     router.push({
       pathname: '/hireForm',
-      params: {
-        provider_id: item.id,
-        provider_name: item.name,
-      },
+      params: { provider_id: item.id, provider_name: item.name },
     });
   };
 
-  // Navigate to user profile
   const handleViewProfile = () => {
     router.push({
       pathname: '/userProfile',
       params: {
-        user_id: item.id,
-        provider_name: item.name,
-        provider_location: item.location,
-        provider_rating: item.rating?.toString(),
+        user_id:              item.id,
+        provider_name:        item.name,
+        provider_location:    item.location,
+        provider_rating:      item.rating?.toString(),
         provider_description: item.description || '',
-        provider_phone: item.phone || '',
+        provider_phone:       item.phone || '',
       },
     });
+  };
+
+  const handleMessage = async () => {
+    try {
+      const conv = await getOrCreateConversation(item.id);
+      router.push({
+        pathname: '/chatScreen',
+        params: {
+          conversation_id: conv.conversation_id,
+          other_user_id:   item.id,
+          other_name:      item.name,
+          other_image:     item.image?.uri || '',
+        },
+      });
+    } catch (err) {
+      console.error('Failed to open chat:', err);
+    }
   };
 
   return (
     <View style={styles.card}>
       <Image source={item.image} style={styles.cardImage} />
-
       <View style={styles.cardOverlay}>
-        {/* Name */}
         <Text style={styles.cardName}>{item.name}</Text>
-
-        {/* Location + Rating */}
         <View style={styles.cardLocationRow}>
-          <Ionicons
-            name="location-sharp"
-            size={12}
-            color="#FF9D00"
-          />
-
-          <Text style={styles.cardLocation}>
-            {item.location}
-          </Text>
-
+          <Ionicons name="location-sharp" size={12} color="#FF9D00" />
+          <Text style={styles.cardLocation}>{item.location}</Text>
           {item.rating && (
             <View style={styles.ratingBadge}>
-              <Ionicons
-                name="star"
-                size={10}
-                color="#FF9D00"
-              />
-
-              <Text style={styles.ratingText}>
-                {item.rating}
-              </Text>
+              <Ionicons name="star" size={10} color="#FF9D00" />
+              <Text style={styles.ratingText}>{item.rating}</Text>
             </View>
           )}
         </View>
-
-        {/* Buttons */}
         <View style={styles.cardButtons}>
-          {/* View Profile */}
-          <TouchableOpacity
-            style={styles.viewBtn}
-            onPress={handleViewProfile}
-            accessible
-            accessibilityRole="button"
-          >
-            <Text style={styles.viewBtnText}>
-              View Profile
-            </Text>
+          <TouchableOpacity style={styles.viewBtn} onPress={handleViewProfile}>
+            <Text style={styles.viewBtnText}>{t('viewProfile')}</Text>
           </TouchableOpacity>
-
-          {/* Hire */}
-          <TouchableOpacity
-            style={styles.hireBtn}
-            onPress={handleHire}
-            accessible
-            accessibilityRole="button"
-          >
-            <Text style={styles.hireBtnText}>
-              Hire
-            </Text>
+          <TouchableOpacity style={styles.msgBtn} onPress={handleMessage}>
+            <Ionicons name="chatbubble-outline" size={12} color="#FF9D00" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.hireBtn} onPress={handleHire}>
+            <Text style={styles.hireBtnText}>{t('hire')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -187,42 +167,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  cardButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-
+  cardButtons: { flexDirection: 'row', gap: 6, marginTop: 8 },
   viewBtn: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 6,
-
-    borderWidth: 1,
-    borderColor: 'white',
-
-    alignItems: 'center',
+    flex: 1, paddingVertical: 6, borderRadius: 6,
+    borderWidth: 1, borderColor: 'white', alignItems: 'center',
   },
-
-  viewBtnText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '600',
+  viewBtnText:  { color: 'white', fontSize: 11, fontWeight: '600' },
+  msgBtn: {
+    width: 30, paddingVertical: 6, borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center',
   },
-
   hireBtn: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 6,
-
-    backgroundColor: '#FF9D00',
-
-    alignItems: 'center',
+    flex: 1, paddingVertical: 6, borderRadius: 6,
+    backgroundColor: '#FF9D00', alignItems: 'center',
   },
-
-  hireBtnText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  hireBtnText:  { color: 'white', fontSize: 11, fontWeight: '600' },
 });

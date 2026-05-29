@@ -1,60 +1,98 @@
-import React from 'react';
-import { Link } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  Image, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, Image,
+  ScrollView, Alert, Modal, FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const USER = {
-  name: 'Charles Glosei',
-  city: 'Soa, Yaounde',
-  phone: '6********',
-  email: 'Email@gmail.com',
-  image: { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' },
-};
-
-const MENU_ITEMS = [
-  { icon: 'shield-checkmark-outline', label: 'Account & Security', value: null,      key: 'security' },
-  { icon: 'language-outline',         label: 'Languages',          value: 'English', key: 'languages' },
-  { icon: 'headset-outline',          label: 'Contact Us',         value: null,      key: 'contact' },
-  { icon: 'gift-outline',             label: 'Invite Your friends', value: null,     key: 'invite' },
-];
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage, Lang } from '../context/LanguageContext';
+import { updateUserProfile } from '../utils/api';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const { lang, t, setLang } = useLanguage();
+
+  const [user,           setUser]           = useState<any>(null);
+  const [showLangModal,  setShowLangModal]  = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('user').then(raw => {
+      if (raw) setUser(JSON.parse(raw));
+    });
+  }, []);
+
+  // ── Logout ────────────────────────────────────────────────────
+  const handleLogout = () => {
+    Alert.alert(t('logout'), t('logoutConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('confirm'), style: 'destructive',
+        onPress: async () => {
+          await AsyncStorage.multiRemove(['token', 'user']);
+          router.replace('/signIn');
+        },
+      },
+    ]);
+  };
+
+  // ── Language picker ───────────────────────────────────────────
+  const LANGUAGES = [
+    { key: 'en' as Lang, label: t('english'), flag: '🇬🇧' },
+    { key: 'fr' as Lang, label: t('french'),  flag: '🇫🇷' },
+  ];
+
+  const currentLangLabel = LANGUAGES.find(l => l.key === lang)?.label ?? 'English';
+
+  const MENU_ITEMS = [
+    { icon: 'shield-checkmark-outline', label: t('accountSecurity'), key: 'security',  value: null },
+    { icon: 'language-outline',         label: t('languages'),       key: 'languages', value: currentLangLabel },
+    { icon: 'headset-outline',          label: t('contactUs'),       key: 'contact',   value: null },
+    { icon: 'gift-outline',             label: t('inviteFriends'),   key: 'invite',    value: null },
+  ];
 
   const handleMenuPress = (key: string) => {
-    Alert.alert(key, `${key} screen coming soon`);
+    if (key === 'languages') { setShowLangModal(true); return; }
+    Alert.alert(key, `${key} coming soon`);
   };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
 
       {/* Title */}
-      <Text style={styles.pageTitle}>Profile</Text>
+      <Text style={styles.pageTitle}>{t('profile')}</Text>
 
       {/* Avatar */}
       <View style={styles.avatarWrapper}>
-        <Image source={USER.image} style={styles.avatar} />
+        <Image
+          source={
+            user?.profile_picture
+              ? { uri: user.profile_picture }
+              : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400' }
+          }
+          style={styles.avatar}
+        />
       </View>
-      <Text style={styles.userName}>{USER.name}</Text>
+      <Text style={styles.userName}>{user?.name ?? '...'}</Text>
 
-      {/* Edit Profile — ✅ href points to app/editProfile.tsx */}
-      <Link href="/editProfile" asChild>
-        <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}>
-          <View style={styles.menuIconBox}>
-            <Ionicons name="pencil-outline" size={18} color="#FF9D00" />
-          </View>
-          <Text style={styles.menuLabel}>Edit Profile</Text>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
-        </TouchableOpacity>
-      </Link>
+      {/* Edit Profile */}
+      <TouchableOpacity
+        style={styles.menuRow}
+        activeOpacity={0.7}
+        onPress={() => router.push('/editProfile')}
+      >
+        <View style={styles.menuIconBox}>
+          <Ionicons name="pencil-outline" size={18} color="#FF9D00" />
+        </View>
+        <Text style={styles.menuLabel}>{t('editProfile')}</Text>
+        <Ionicons name="chevron-forward" size={18} color="#ccc" />
+      </TouchableOpacity>
 
       {/* Info */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>Lives in {USER.city}</Text>
-        <Text style={styles.infoText}>Phone number: {USER.phone}</Text>
-        <Text style={styles.infoText}>Email :{USER.email}</Text>
+        {user?.city        && <Text style={styles.infoText}>{t('livesIn')} {user.city}</Text>}
+        {user?.phone_number && <Text style={styles.infoText}>{t('phone')}: {user.phone_number}</Text>}
+        {user?.email       && <Text style={styles.infoText}>{t('email')}: {user.email}</Text>}
       </View>
 
       {/* Menu Items */}
@@ -77,22 +115,45 @@ export default function ProfileScreen() {
       </View>
 
       {/* Logout */}
-      <TouchableOpacity
-        style={styles.logoutRow}
-        onPress={() => Alert.alert('Logout', 'Are you sure you want to logout?')}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={styles.logoutRow} onPress={handleLogout} activeOpacity={0.7}>
         <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
-        <Text style={styles.logoutText}>Logout</Text>
+        <Text style={styles.logoutText}>{t('logout')}</Text>
       </TouchableOpacity>
 
       <View style={{ height: 30 }} />
+
+      {/* Language Modal */}
+      <Modal visible={showLangModal} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLangModal(false)}
+        >
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>{t('selectLanguage')}</Text>
+            {LANGUAGES.map((l) => (
+              <TouchableOpacity
+                key={l.key}
+                style={[styles.langRow, lang === l.key && styles.langRowActive]}
+                onPress={() => { setLang(l.key); setShowLangModal(false); }}
+              >
+                <Text style={styles.langFlag}>{l.flag}</Text>
+                <Text style={[styles.langLabel, lang === l.key && styles.langLabelActive]}>
+                  {l.label}
+                </Text>
+                {lang === l.key && <Ionicons name="checkmark" size={20} color="#FF9D00" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: '#fff' },
+  container:    { flex: 1, backgroundColor: '#fff' },
   pageTitle: {
     fontSize: 18, fontWeight: 'bold',
     textAlign: 'center', marginTop: 16, color: '#111',
@@ -106,8 +167,8 @@ const styles = StyleSheet.create({
     fontSize: 22, fontWeight: 'bold', textAlign: 'center',
     color: '#111', marginTop: 12, marginBottom: 8,
   },
-  infoBox:  { paddingHorizontal: 24, marginVertical: 12, gap: 4 },
-  infoText: { fontSize: 14, color: '#444', lineHeight: 22 },
+  infoBox:   { paddingHorizontal: 24, marginVertical: 12, gap: 4 },
+  infoText:  { fontSize: 14, color: '#444', lineHeight: 22 },
   menuSection: { marginTop: 4 },
   menuRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -119,11 +180,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF4E5', alignItems: 'center',
     justifyContent: 'center', marginRight: 14,
   },
-  menuLabel: { flex: 1, fontSize: 15, color: '#222' },
-  menuValue: { fontSize: 14, color: '#FF9D00', marginRight: 6 },
+  menuLabel:  { flex: 1, fontSize: 15, color: '#222' },
+  menuValue:  { fontSize: 14, color: '#FF9D00', marginRight: 6 },
   logoutRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 24, paddingVertical: 20, gap: 10,
   },
   logoutText: { fontSize: 16, color: '#FF3B30', fontWeight: '600' },
+  // Modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 24,
+    borderTopRightRadius: 24, paddingHorizontal: 24,
+    paddingBottom: 40, paddingTop: 12,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: '#E0E0E0', alignSelf: 'center', marginBottom: 20,
+  },
+  modalTitle:   { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 16 },
+  langRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, gap: 14,
+    borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+  },
+  langRowActive: { backgroundColor: '#FFF9F0', borderRadius: 10, paddingHorizontal: 8 },
+  langFlag:      { fontSize: 24 },
+  langLabel:     { flex: 1, fontSize: 16, color: '#333' },
+  langLabelActive: { color: '#FF9D00', fontWeight: '700' },
 });

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMessages, sendMessage } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function ChatScreen() {
   const [sending,     setSending]     = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  const { t } = useLanguage();
   const listRef    = useRef<FlatList>(null);
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -126,7 +128,7 @@ export default function ChatScreen() {
         />
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.headerName}>{other_name}</Text>
-          <Text style={styles.headerSub}>Tap to view profile</Text>
+          <Text style={styles.headerSub}>{t('tapViewProfile')}</Text>
         </View>
         <Ionicons name="ellipsis-vertical" size={22} color="#111" />
       </View>
@@ -152,7 +154,7 @@ export default function ChatScreen() {
             ListEmptyComponent={
               <View style={styles.emptyBox}>
                 <Ionicons name="chatbubble-ellipses-outline" size={48} color="#ddd" />
-                <Text style={styles.emptyText}>Say hello!</Text>
+                <Text style={styles.emptyText}>{t('sayHello')}</Text>
               </View>
             }
           />
@@ -162,7 +164,7 @@ export default function ChatScreen() {
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
-            placeholder="Type a message..."
+            placeholder={t('typeMessage')}
             placeholderTextColor="#999"
             value={input}
             onChangeText={setInput}

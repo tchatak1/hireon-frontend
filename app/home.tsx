@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useLanguage } from '../context/LanguageContext';
 import HomeScreen          from '../screens/HomeScreen';
 import FavouritesScreen    from '../screens/FavouritesScreen';
 import ChatsScreen         from '../screens/ChatsScreen';
@@ -10,18 +11,20 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen       from '../screens/ProfileScreen';
 import { getNotifications, getConversations } from '../utils/api';
 
-const TABS = [
-  { key: 'Home',          icon: 'home',            iconOut: 'home-outline' },
-  { key: 'Favourites',    icon: 'star',            iconOut: 'star-outline' },
-  { key: 'Chats',         icon: 'chatbubbles',     iconOut: 'chatbubbles-outline' },
-  { key: 'Notifications', icon: 'notifications',   iconOut: 'notifications-outline' },
-  { key: 'Profile',       icon: 'person',          iconOut: 'person-outline' },
-];
-
 export default function MainApp() {
+  const { t } = useLanguage();
+
   const [activeTab,    setActiveTab]    = useState('Home');
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadChats,  setUnreadChats]  = useState(0);
+
+  const TABS = [
+    { key: 'Home',          label: t('home'),          icon: 'home',          iconOut: 'home-outline' },
+    { key: 'Favourites',    label: t('favourites'),    icon: 'star',          iconOut: 'star-outline' },
+    { key: 'Chats',         label: t('messages'),      icon: 'chatbubbles',   iconOut: 'chatbubbles-outline' },
+    { key: 'Notifications', label: t('notifications'), icon: 'notifications', iconOut: 'notifications-outline' },
+    { key: 'Profile',       label: t('profile'),       icon: 'person',        iconOut: 'person-outline' },
+  ];
 
   const refreshUnread = useCallback(async () => {
     try {
@@ -55,7 +58,6 @@ export default function MainApp() {
         <View style={styles.appContainer}>
           <View style={{ flex: 1 }}>{renderScreen()}</View>
 
-          {/* Bottom Tab Bar */}
           <View style={styles.tabBar}>
             {TABS.map((tab) => {
               const isActive   = activeTab === tab.key;
@@ -86,7 +88,7 @@ export default function MainApp() {
                     )}
                   </View>
                   <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                    {tab.key}
+                    {tab.label}
                   </Text>
                 </TouchableOpacity>
               );

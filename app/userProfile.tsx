@@ -9,6 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserProfile, submitReview, markJobCompleted, getOrCreateConversation } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function UserProfileScreen() {
   const router = useRouter();
@@ -27,6 +28,19 @@ export default function UserProfileScreen() {
   const [submitting,    setSubmitting]    = useState(false);
   const [completing,    setCompleting]    = useState(false);
   const [messaging,     setMessaging]     = useState(false);
+  const { t } = useLanguage();
+  // Translate region name
+  const translateRegion = (region: string | undefined): string => {
+    if (!region) return '';
+    const map: Record<string, any> = {
+      'Adamaoua': 'adamaoua', 'Centre': 'centre', 'East': 'east',
+      'Far North': 'farNorth', 'Littoral': 'littoral', 'North': 'north',
+      'North West': 'northWest', 'South': 'south', 'South West': 'southWest',
+    };
+    const key = map[region];
+    return key ? t(key) : region;
+  };
+
 
   // Fix #3: track completion & review locally so buttons disappear immediately
   const [isCompleted, setIsCompleted] = useState(false);
@@ -227,7 +241,7 @@ export default function UserProfileScreen() {
                 <View style={styles.locationRow}>
                   <Ionicons name="location-sharp" size={14} color="#FF9D00" />
                   <Text style={styles.locationText}>
-                    {profile.city}{profile.location ? `, ${profile.location}` : ''}
+                    {profile.city}{profile.location ? `, ${translateRegion(profile.location)}` : ''}
                   </Text>
                 </View>
               )}
@@ -245,7 +259,7 @@ export default function UserProfileScreen() {
 
             {profile.bio && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About</Text>
+                <Text style={styles.sectionTitle}>{t('about')}</Text>
                 <Text style={styles.bioText}>{profile.bio}</Text>
               </View>
             )}
@@ -262,7 +276,7 @@ export default function UserProfileScreen() {
                     ? <ActivityIndicator color="white" size="small" />
                     : <>
                         <Ionicons name="checkmark-circle-outline" size={18} color="white" />
-                        <Text style={styles.completeBtnText}>Mark Completed</Text>
+                        <Text style={styles.completeBtnText}>{t('markCompleteBtn')}</Text>
                       </>
                   }
                 </TouchableOpacity>
@@ -274,7 +288,7 @@ export default function UserProfileScreen() {
                   onPress={() => setShowRating(true)}
                 >
                   <Ionicons name="star-outline" size={18} color="#FF9D00" />
-                  <Text style={styles.rateBtnText}>Rate</Text>
+                  <Text style={styles.rateBtnText}>{t('rate')}</Text>
                 </TouchableOpacity>
               )}
 
@@ -287,7 +301,7 @@ export default function UserProfileScreen() {
                   ? <ActivityIndicator size="small" color="#FF9D00" />
                   : <Ionicons name="chatbubble-outline" size={18} color="#FF9D00" />
                 }
-                <Text style={styles.messageBtnText}>Message</Text>
+                <Text style={styles.messageBtnText}>{t('message')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -298,15 +312,15 @@ export default function UserProfileScreen() {
                 })}
               >
                 <Ionicons name="briefcase-outline" size={18} color="white" />
-                <Text style={styles.hireBtnText}>Hire</Text>
+                <Text style={styles.hireBtnText}>{t('hire')}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Reviews */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Reviews ({profile.total_reviews})</Text>
+              <Text style={styles.sectionTitle}>{t('reviews')} ({profile.total_reviews})</Text>
               {profile.reviews.length === 0 ? (
-                <Text style={styles.noReviews}>No reviews yet</Text>
+                <Text style={styles.noReviews}>{t('noReviews')}</Text>
               ) : (
                 profile.reviews.map((review: any) => (
                   <View key={review.review_id} style={styles.reviewCard}>

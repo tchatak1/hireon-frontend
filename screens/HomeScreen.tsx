@@ -7,43 +7,45 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAllUsers, getRecommendations } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 import { ProfessionalCard } from '../components/ProfessionalCard';
 
 const { width } = Dimensions.get('window');
 
-const SKILLS = ['Painters', 'Electrician', 'Mechanic', 'Plumber', 'Carpenter', 'Tiler'];
+const SKILL_KEYS = ['painters', 'electrician', 'mechanic', 'plumber', 'carpenter', 'tiler'] as const;
 
 const HERO_IMAGES: Record<string, any> = {
-  Painters:    { uri: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800' },
-  Electrician: { uri: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=800' },
-  Mechanic:    { uri: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?w=800' },
-  Plumber:     { uri: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=800' },
-  Carpenter:   { uri: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=800' },
-  Tiler:       { uri: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800' },
+  painters:    { uri: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800' },
+  electrician: { uri: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=800' },
+  mechanic:    { uri: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?w=800' },
+  plumber:     { uri: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=800' },
+  carpenter:   { uri: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=800' },
+  tiler:       { uri: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800' },
 };
 
 const SKILL_MAP: Record<string, string> = {
-  Painters:    'Painter',
-  Electrician: 'Electrician',
-  Mechanic:    'Mechanic',
-  Plumber:     'Plumber',
-  Carpenter:   'Carpenter',
-  Tiler:       'Tiler',
+  painters:    'Painter',
+  electrician: 'Electrician',
+  mechanic:    'Mechanic',
+  plumber:     'Plumber',
+  carpenter:   'Carpenter',
+  tiler:       'Tiler',
 };
 
 export default function HomeScreen() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [allUsers,    setAllUsers]    = useState<any[]>([]);
-  const [recommended, setRecommended] = useState<any[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [loadingRec,  setLoadingRec]  = useState(true);
-  const [refreshing,  setRefreshing]  = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeIndex,    setActiveIndex]    = useState(0);
+  const [allUsers,       setAllUsers]       = useState<any[]>([]);
+  const [recommended,    setRecommended]    = useState<any[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [loadingRec,     setLoadingRec]     = useState(true);
+  const [refreshing,     setRefreshing]     = useState(false);
+  const [searchQuery,    setSearchQuery]    = useState('');
 
   const heroScrollRef  = useRef<ScrollView>(null);
   const skillScrollRef = useRef<ScrollView>(null);
 
-  const activeSkill = SKILLS[activeIndex];
+  const activeSkill = SKILL_KEYS[activeIndex];
+  const { t } = useLanguage();
 
   const fetchUsers = async () => {
     try {
@@ -63,6 +65,7 @@ export default function HomeScreen() {
       const recs = await getRecommendations({ limit: 10 });
       setRecommended(recs);
     } catch (err) {
+      // Silently fail — recommendations are a bonus, not critical
       console.warn('Recommendations unavailable:', err);
       setRecommended([]);
     } finally {
@@ -83,7 +86,7 @@ export default function HomeScreen() {
 
   const onHeroScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
-    if (index >= 0 && index < SKILLS.length && index !== activeIndex) {
+    if (index >= 0 && index < SKILL_KEYS.length && index !== activeIndex) {
       setActiveIndex(index);
       skillScrollRef.current?.scrollTo({ x: index * 100, animated: true });
     }
@@ -126,7 +129,7 @@ export default function HomeScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF9D00']} />
       }
     >
-      {/* ── Hero Carousel ─────────────────────────────────── */}
+      {/* ── Hero Carousel ───────────────────────────────────── */}
       <View style={styles.heroContainer}>
         <ScrollView
           ref={heroScrollRef}
@@ -137,11 +140,11 @@ export default function HomeScreen() {
           onMomentumScrollEnd={onHeroScroll}
           onScrollEndDrag={onHeroScroll}
         >
-          {SKILLS.map((skill) => (
+          {SKILL_KEYS.map((skill) => (
             <View key={skill} style={styles.heroSlide}>
               <Image source={HERO_IMAGES[skill]} style={styles.heroImage} />
               <View style={styles.heroOverlay} />
-              <Text style={styles.heroLabel}>{skill}</Text>
+              <Text style={styles.heroLabel}>{t(skill as any)}</Text>
             </View>
           ))}
         </ScrollView>
@@ -151,7 +154,7 @@ export default function HomeScreen() {
           <View style={styles.searchBar}>
             <Ionicons name="search" size={18} color="#999" style={{ marginRight: 8 }} />
             <TextInput
-              placeholder="Search for Name, Category or location"
+              placeholder={t('searchPlaceholder')}
               placeholderTextColor="#999"
               style={styles.searchInput}
               value={searchQuery}
@@ -167,7 +170,7 @@ export default function HomeScreen() {
 
         {/* Dots */}
         <View style={styles.heroDots}>
-          {SKILLS.map((_, i) => (
+          {SKILL_KEYS.map((_, i) => (
             <TouchableOpacity key={i} onPress={() => onSkillPress(i)} activeOpacity={1}>
               <View style={[styles.dot, i === activeIndex && styles.dotActive]} />
             </TouchableOpacity>
@@ -175,17 +178,17 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ── Search Results ─────────────────────────────────── */}
+      {/* ── Search Results ───────────────────────────────────── */}
       {searchQuery.trim().length > 0 && (
         <View style={{ paddingTop: 8 }}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Results ({searchResults.length})</Text>
+            <Text style={styles.sectionTitle}>{t('results')} ({searchResults.length})</Text>
             <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.8}>
-              <Text style={styles.seeAll}>Clear</Text>
+              <Text style={styles.seeAll}>{t('clear')}</Text>
             </TouchableOpacity>
           </View>
           {searchResults.length === 0 ? (
-            <Text style={styles.emptyText}>No users found for "{searchQuery}"</Text>
+            <Text style={styles.emptyText}>{t('noAvailable')} -  "{searchQuery}"</Text>
           ) : (
             <FlatList
               data={searchResults.map(toCard)}
@@ -199,18 +202,19 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ── Main content ───────────────────────────────────── */}
+      {/* ── Main content (hidden when searching) ────────────── */}
       {searchQuery.trim().length === 0 && (
         <>
-          {/* ── Recommended for You ──────────────────────── */}
+          {/* ── Recommended for You ──────────────────────────── */}
           {(loadingRec || recommended.length > 0) && (
             <>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionTitleRow}>
                   <Ionicons name="star" size={16} color="#FF9D00" style={{ marginRight: 6 }} />
-                  <Text style={styles.sectionTitle}>Recommended for You</Text>
+                  <Text style={styles.sectionTitle}>{t('recommended')}</Text>
                 </View>
               </View>
+
               {loadingRec ? (
                 <View style={styles.recLoadingBox}>
                   <ActivityIndicator size="small" color="#FF9D00" />
@@ -238,14 +242,14 @@ export default function HomeScreen() {
             </>
           )}
 
-          {/* ── Skill Chips ──────────────────────────────── */}
+          {/* ── Skill Chips ───────────────────────────────────── */}
           <ScrollView
             ref={skillScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.skillsRow}
           >
-            {SKILLS.map((skill, index) => {
+            {SKILL_KEYS.map((skill, index) => {
               const isActive = index === activeIndex;
               return (
                 <TouchableOpacity
@@ -255,7 +259,7 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.skillChipText, isActive && styles.skillChipTextActive]}>
-                    {skill}
+                    {t(skill as any)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -265,20 +269,20 @@ export default function HomeScreen() {
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color="#FF9D00" />
-              <Text style={styles.loadingText}>Loading professionals...</Text>
+              <Text style={styles.loadingText}>{t('loadingPros')}</Text>
             </View>
           ) : (
             <>
               {/* Top Picks */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Our Top picks</Text>
+                <Text style={styles.sectionTitle}>{t('topPicks')}</Text>
                 <TouchableOpacity activeOpacity={0.8}>
-                  <Text style={styles.seeAll}>See all</Text>
+                  <Text style={styles.seeAll}>{t('seeAll')}</Text>
                 </TouchableOpacity>
               </View>
               {topPicks.length === 0 ? (
                 <Text style={styles.emptyText}>
-                  No available {activeSkill.toLowerCase()} yet
+                  {t('noAvailable')} {t(activeSkill.toLowerCase() as any) || activeSkill.toLowerCase()} {t('yet')}
                 </Text>
               ) : (
                 <FlatList
@@ -293,14 +297,14 @@ export default function HomeScreen() {
 
               {/* New Professionals */}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>New professionals</Text>
+                <Text style={styles.sectionTitle}>{t('newPros')}</Text>
                 <TouchableOpacity activeOpacity={0.8}>
-                  <Text style={styles.seeAll}>See all</Text>
+                  <Text style={styles.seeAll}>{t('seeAll')}</Text>
                 </TouchableOpacity>
               </View>
               {newProfs.length === 0 ? (
                 <Text style={styles.emptyText}>
-                  No new {activeSkill.toLowerCase()} yet
+                  {t('noNew')} {t(activeSkill.toLowerCase() as any) || activeSkill.toLowerCase()} {t('yet')}
                 </Text>
               ) : (
                 <FlatList
@@ -322,10 +326,10 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenContainer: { flex: 1, backgroundColor: '#fff' },
-  heroContainer:   { width: '100%', height: 220, position: 'relative' },
-  heroSlide:       { width, height: 220, position: 'relative' },
-  heroImage:       { width: '100%', height: '100%', resizeMode: 'cover' },
+  screenContainer:   { flex: 1, backgroundColor: '#fff' },
+  heroContainer:     { width: '100%', height: 220, position: 'relative' },
+  heroSlide:         { width, height: 220, position: 'relative' },
+  heroImage:         { width: '100%', height: '100%', resizeMode: 'cover' },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.25)',
@@ -345,22 +349,22 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
   },
-  searchInput: { flex: 1, fontSize: 13, color: '#333' },
+  searchInput:       { flex: 1, fontSize: 13, color: '#333' },
   heroDots: {
     position: 'absolute', bottom: 12,
     width: '100%', flexDirection: 'row',
     justifyContent: 'center', gap: 6,
   },
-  dot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotActive: { backgroundColor: '#FF9D00', width: 22, borderRadius: 4 },
+  dot:               { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotActive:         { backgroundColor: '#FF9D00', width: 22, borderRadius: 4 },
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingHorizontal: 16, marginBottom: 10, marginTop: 16,
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  sectionTitle:    { fontSize: 16, fontWeight: 'bold', color: '#111' },
-  seeAll:          { fontSize: 13, color: '#FF9D00', fontWeight: '600' },
-  skillsRow:       { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
+  sectionTitleRow:   { flexDirection: 'row', alignItems: 'center' },
+  sectionTitle:      { fontSize: 16, fontWeight: 'bold', color: '#111' },
+  seeAll:            { fontSize: 13, color: '#FF9D00', fontWeight: '600' },
+  skillsRow:         { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   skillChip: {
     paddingHorizontal: 16, paddingVertical: 8,
     borderRadius: 20, borderWidth: 1.5,
@@ -369,16 +373,20 @@ const styles = StyleSheet.create({
   skillChipActive:     { backgroundColor: '#FF9D00' },
   skillChipText:       { fontSize: 13, fontWeight: '600', color: '#FF9D00' },
   skillChipTextActive: { color: 'white' },
-  cardList:       { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
-  loadingBox:     { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  recLoadingBox:  { alignItems: 'center', paddingVertical: 20 },
-  loadingText:    { color: '#999', fontSize: 14 },
-  emptyText:      { color: '#999', fontSize: 13, paddingHorizontal: 16, paddingBottom: 16 },
-  divider:        { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 16, marginTop: 8 },
+  cardList:            { paddingHorizontal: 16, gap: 12, paddingBottom: 4 },
+  loadingBox:          { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  recLoadingBox:       { alignItems: 'center', paddingVertical: 20 },
+  loadingText:         { color: '#999', fontSize: 14 },
+  emptyText:           { color: '#999', fontSize: 13, paddingHorizontal: 16, paddingBottom: 16 },
+  divider:             { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 16, marginTop: 8 },
   categoryBadge: {
-    alignSelf: 'flex-start', marginLeft: 4, marginTop: 4,
-    backgroundColor: '#FFF3E0', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginLeft: 4,
+    marginTop: 4,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   categoryBadgeText: { fontSize: 10, color: '#FF9D00', fontWeight: '600' },
 });

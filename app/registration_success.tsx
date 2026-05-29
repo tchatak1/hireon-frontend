@@ -1,4 +1,5 @@
 import { Link } from 'expo-router';
+import { useLanguage } from '../context/LanguageContext';
 import React, { useRef, useEffect } from 'react';
 import {
   View,
@@ -11,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const AnimatedImageScreen: React.FC = () => {
+  const { t } = useLanguage();
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
 
@@ -39,12 +41,12 @@ const AnimatedImageScreen: React.FC = () => {
             style={[styles.image, { opacity, transform: [{ scale }] }]}
             resizeMode="contain"
           />
-          <Text style={styles.congrats}>Congratulations</Text>
-          <Text style={styles.message}>Your Account has been Successfully Created</Text>
+          <Text style={styles.congrats}>{t('congratulations')}</Text>
+          <Text style={styles.message}>{t('accountCreated')}</Text>
           <TouchableOpacity style={styles.button}>
           <Link href="/profile_setup">
 
-            <Text style={styles.buttonText}>Continue</Text>
+            <Text style={styles.buttonText}>{t('continueBtn')}</Text>
           </Link>
 
           </TouchableOpacity>

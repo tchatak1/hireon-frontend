@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '../context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -32,6 +33,7 @@ const PHONE_CODES = ['+237', '+1', '+33', '+44', '+234'];
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   // Form state
   const [name,      setName]      = useState('');
@@ -188,7 +190,7 @@ export default function ProfileSetupScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={22} color="#111" />
             </TouchableOpacity>
-            <Text style={styles.pageTitle}>Complete your Profile</Text>
+            <Text style={styles.pageTitle}>{t('completeProfile')}</Text>
             <View style={{ width: 36 }} />
           </View>
 
@@ -208,34 +210,34 @@ export default function ProfileSetupScreen() {
               }
             </View>
           </TouchableOpacity>
-          <Text style={styles.avatarHint}>Tap to upload photo</Text>
+          <Text style={styles.avatarHint}>{t('tapToUpload')}</Text>
 
           <View style={styles.form}>
 
             {/* Name */}
-            <Text style={styles.label}>Name</Text>
+            <Text style={styles.label}>{t('name')}</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="Full Name"
+              placeholder={t('fullName')}
               placeholderTextColor="#bbb"
             />
 
             {/* Email (read only) */}
-            <Text style={styles.label}>Email Address</Text>
+            <Text style={styles.label}>{t('emailAddress')}</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
               value={email}
               editable={false}
-              placeholder="Email address"
+              placeholder={t('emailAddress')}
               placeholderTextColor="#bbb"
             />
 
             {/* Region + Phone code */}
             <View style={styles.row}>
               <View style={{ flex: 1.2 }}>
-                <Text style={styles.label}>Region</Text>
+                <Text style={styles.label}>{t('region')}</Text>
                 <TouchableOpacity
                   style={styles.dropdown}
                   onPress={() => setModalType('region')}
@@ -248,7 +250,7 @@ export default function ProfileSetupScreen() {
               </View>
               <View style={{ width: 12 }} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Phone code</Text>
+                <Text style={styles.label}>{t('phoneCode')}</Text>
                 <TouchableOpacity
                   style={styles.dropdown}
                   onPress={() => setModalType('phone')}
@@ -260,7 +262,7 @@ export default function ProfileSetupScreen() {
             </View>
 
             {/* Phone number */}
-            <Text style={styles.label}>Phone Number</Text>
+            <Text style={styles.label}>{t('phoneNumber')}</Text>
             <TextInput
               style={styles.input}
               value={phone}
@@ -276,23 +278,23 @@ export default function ProfileSetupScreen() {
               style={styles.input}
               value={city}
               onChangeText={setCity}
-              placeholder="Enter your city"
+              placeholder={t('city')}
               placeholderTextColor="#bbb"
             />
 
             {/* Age */}
-            <Text style={styles.label}>Age</Text>
+            <Text style={styles.label}>{t('age')}</Text>
             <TextInput
               style={styles.input}
               value={age}
               onChangeText={setAge}
-              placeholder="Your age"
+              placeholder={t('age')}
               placeholderTextColor="#bbb"
               keyboardType="numeric"
             />
 
             {/* Skills */}
-            <Text style={styles.label}>Skills</Text>
+            <Text style={styles.label}>{t('skills')}</Text>
             <TouchableOpacity
               style={styles.dropdown}
               onPress={() => setModalType('skill')}
@@ -304,7 +306,7 @@ export default function ProfileSetupScreen() {
             </TouchableOpacity>
 
             {/* CV Upload */}
-            <Text style={styles.label}>Upload your CV (PDF)</Text>
+            <Text style={styles.label}>{t('uploadCv')}</Text>
             <TouchableOpacity style={styles.cvUploadBtn} onPress={pickCV}>
               <Ionicons
                 name={cvUri ? 'document-text' : 'cloud-upload-outline'}
@@ -336,7 +338,7 @@ export default function ProfileSetupScreen() {
                 style={[styles.input, styles.textArea]}
                 value={bio}
                 onChangeText={setBio}
-                placeholder="Upload your CV above to auto-generate, or type manually..."
+                placeholder={t('bioPlaceholder')}
                 placeholderTextColor="#bbb"
                 multiline
                 numberOfLines={4}
@@ -352,7 +354,7 @@ export default function ProfileSetupScreen() {
             >
               {loading
                 ? <ActivityIndicator color="white" />
-                : <Text style={styles.saveBtnText}>Save & Continue</Text>
+                : <Text style={styles.saveBtnText}>{t('saveAndContinue')}</Text>
               }
             </TouchableOpacity>
 
@@ -381,7 +383,7 @@ export default function ProfileSetupScreen() {
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalType(null)}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>

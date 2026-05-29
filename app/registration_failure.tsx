@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Link } from 'expo-router';
+import { useLanguage } from '../context/LanguageContext';
 import {
   View,
   Text,
@@ -12,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const AnimatedImageScreen: React.FC = () => {
+  const { t } = useLanguage();
   const opacity = useRef(new Animated.Value(0));
   const scale = useRef(new Animated.Value(0.5));
 
@@ -52,11 +54,11 @@ const AnimatedImageScreen: React.FC = () => {
             ]}
             resizeMode="contain"
           />
-          <Text style={styles.congrats}>Oops, Sorry</Text>
-          <Text style={styles.message}>An error occurred, please try again</Text>
+          <Text style={styles.congrats}>{t('oopsSorry')}</Text>
+          <Text style={styles.message}>{t('errorOccurred')}</Text>
           <Link href="/accountCreation" asChild>
             <TouchableOpacity style={styles.button}>
-              <Text style={styles.buttonText}>Back</Text>
+              <Text style={styles.buttonText}>{t('back')}</Text>
             </TouchableOpacity>
           </Link>
         </View>

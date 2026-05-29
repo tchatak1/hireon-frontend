@@ -330,3 +330,23 @@ export const sendMessage = async (conversationId: string, content: string) => {
   if (!response.ok) throw new Error(data.detail || 'Failed to send message');
   return data;
 };
+
+// ── Update user profile ───────────────────────────────────────────
+export const updateUserProfile = async (updates: {
+  city?:         string;
+  location?:     string;
+  category?:     string;
+  bio?:          string;
+  availability?: boolean;
+  phone_number?: string;
+}) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/auth/me`, {
+    method:  'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body:    JSON.stringify(updates),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to update profile');
+  return data;
+};

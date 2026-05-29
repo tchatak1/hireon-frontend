@@ -7,9 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getConversations } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -40,13 +42,13 @@ export default function ChatsScreen() {
     if (!dateStr) return '';
     const diffMs   = Date.now() - new Date(dateStr).getTime();
     const diffMins = Math.floor(diffMs / 60_000);
-    if (diffMins < 1)   return 'Just now';
-    if (diffMins < 60)  return `${diffMins}m ago`;
+    if (diffMins < 1)   return t('justNow');
+    if (diffMins < 60)  return `${diffMins}${t('minsAgo')}`;
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffHours < 24) return `${diffHours}${t('hoursAgo')}`;
     const diffDays  = Math.floor(diffHours / 24);
-    if (diffDays === 1) return 'Yesterday';
-    return `${diffDays}d ago`;
+    if (diffDays === 1) return t('yesterday');
+    return `${diffDays}${t('daysAgo')}`;
   };
 
   const renderItem = ({ item }: { item: any }) => (
@@ -89,7 +91,7 @@ export default function ChatsScreen() {
             style={[styles.lastMsg, item.unread_count > 0 && styles.lastMsgBold]}
             numberOfLines={1}
           >
-            {item.last_message || 'Start a conversation...'}
+            {item.last_message || t('noConversations')}
           </Text>
           {item.unread_count > 0 && (
             <View style={styles.badge}>
@@ -115,7 +117,7 @@ export default function ChatsScreen() {
           }
           style={styles.headerAvatar}
         />
-        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerTitle}>{t('messages')}</Text>
         <Ionicons name="create-outline" size={24} color="#111" />
       </View>
 
@@ -135,9 +137,9 @@ export default function ChatsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Ionicons name="chatbubbles-outline" size={52} color="#ddd" />
-              <Text style={styles.emptyText}>No conversations yet</Text>
+              <Text style={styles.emptyText}>{t('noConversations')}</Text>
               <Text style={styles.emptySubText}>
-                Visit a professional's profile and tap Message to start chatting
+                {t('noConvSub')}
               </Text>
             </View>
           }

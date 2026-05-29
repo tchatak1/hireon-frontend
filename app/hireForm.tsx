@@ -5,6 +5,7 @@ import {
   Platform, StatusBar,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLanguage } from '../context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +14,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function HireFormScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { provider_id, provider_name } = useLocalSearchParams<{
     provider_id: string;
     provider_name: string;
@@ -39,7 +41,7 @@ export default function HireFormScreen() {
       setLocationLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Location is needed so the provider knows where to go');
+        Alert.alert(t('error'), 'Location is needed so the provider knows where to go');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -57,7 +59,7 @@ export default function HireFormScreen() {
         setAddress(addr);
       }
     } catch {
-      Alert.alert('Location error', 'Could not get your location');
+      Alert.alert(t('error'), 'Could not get your location');
     } finally {
       setLocationLoading(false);
     }
@@ -71,11 +73,11 @@ export default function HireFormScreen() {
 
   const handleSubmit = async () => {
     if (!description.trim()) {
-      Alert.alert('Error', 'Please describe the job');
+      Alert.alert(t('error'), t('describeRequired'));
       return;
     }
     if (!latitude || !longitude) {
-      Alert.alert('Error', 'Location is required. Please allow location access');
+      Alert.alert(t('error'), t('locationRequired'));
       return;
     }
 
@@ -96,7 +98,7 @@ export default function HireFormScreen() {
         [{ text: 'OK', onPress: () => router.push('/home') }]
       );
     } catch (err: any) {
-      Alert.alert('Failed', err.message);
+      Alert.alert(t('failed'), err.message);
     } finally {
       setLoading(false);
     }
@@ -114,19 +116,19 @@ export default function HireFormScreen() {
               <TouchableOpacity onPress={() => router.back()}>
                 <Ionicons name="arrow-back" size={22} color="#111" />
               </TouchableOpacity>
-              <Text style={styles.title}>Hire {provider_name}</Text>
+              <Text style={styles.title}>{t('hireTitle')} {provider_name}</Text>
               <View style={{ width: 22 }} />
             </View>
 
             <View style={styles.form}>
 
               {/* Job Description */}
-              <Text style={styles.label}>Describe the job</Text>
+              <Text style={styles.label}>{t('describeJob')}</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="E.g. I need electrical wiring fixed in my living room..."
+                placeholder={t('jobPlaceholder')}
                 placeholderTextColor="#bbb"
                 multiline
                 numberOfLines={4}
@@ -134,7 +136,7 @@ export default function HireFormScreen() {
               />
 
               {/* Date */}
-              <Text style={styles.label}>Scheduled Date</Text>
+              <Text style={styles.label}>{t('scheduledDate')}</Text>
               <TouchableOpacity
                 style={styles.pickerBtn}
                 onPress={() => setShowDatePicker(true)}
@@ -155,7 +157,7 @@ export default function HireFormScreen() {
               )}
 
               {/* Time */}
-              <Text style={styles.label}>Scheduled Time</Text>
+              <Text style={styles.label}>{t('scheduledTime')}</Text>
               <TouchableOpacity
                 style={styles.pickerBtn}
                 onPress={() => setShowTimePicker(true)}
@@ -175,7 +177,7 @@ export default function HireFormScreen() {
               )}
 
               {/* Location */}
-              <Text style={styles.label}>Your Location</Text>
+              <Text style={styles.label}>{t('yourLocation')}</Text>
               <View style={styles.locationBox}>
                 <Ionicons
                   name="location-sharp"
@@ -207,7 +209,7 @@ export default function HireFormScreen() {
               >
                 {loading
                   ? <ActivityIndicator color="white" />
-                  : <Text style={styles.submitBtnText}>Send Hire Request</Text>
+                  : <Text style={styles.submitBtnText}>{t('sendHireRequest')}</Text>
                 }
               </TouchableOpacity>
 
