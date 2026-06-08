@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, Image, KeyboardAvoidingView,
-  Platform, ActivityIndicator, SafeAreaView,
+  Platform, ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -25,17 +25,15 @@ export default function ChatScreen() {
   const [sending,     setSending]     = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const { t } = useLanguage();
-  const listRef    = useRef<FlatList>(null);
-  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { t }   = useLanguage();
+  const listRef = useRef<FlatList>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('user').then(raw => {
       if (raw) setCurrentUser(JSON.parse(raw));
     });
     fetchMessages();
-
-    // Poll for new messages every 3 seconds
     pollRef.current = setInterval(fetchMessages, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
@@ -60,9 +58,20 @@ export default function ChatScreen() {
       const msg = await sendMessage(conversation_id, text);
       setMessages(prev => [...prev, msg]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch (err) {
-      console.error('Failed to send:', err);
-      setInput(text); // restore on failure
+    } catch (err: any) {
+      if (err.message?.includes('subscription')) {
+        Alert.alert(
+          '⚠️ Subscription Required',
+          'You need an active subscription to send messages.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: '📋 Subscribe', onPress: () => router.push('/subscription' as any) },
+          ]
+        );
+      } else {
+        setInput(text);
+        Alert.alert('Error', err.message || 'Failed to send message');
+      }
     } finally {
       setSending(false);
     }
@@ -70,19 +79,20 @@ export default function ChatScreen() {
 
   const getRelativeTime = (dateStr: string): string => {
     if (!dateStr) return '';
+    const tAny     = t as (key: string) => string;
     const diffMs   = Date.now() - new Date(dateStr).getTime();
     const diffMins = Math.floor(diffMs / 60_000);
-    if (diffMins < 1)   return 'Just now';
-    if (diffMins < 60)  return `${diffMins}m`;
+    if (diffMins < 1)   return tAny('justNow');
+    if (diffMins < 60)  return `${diffMins}${tAny('minsAgo')}`;
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h`;
-    return `${Math.floor(diffHours / 24)}d`;
+    if (diffHours < 24) return `${diffHours}${tAny('hoursAgo')}`;
+    return `${Math.floor(diffHours / 24)}${tAny('daysAgo')}`;
   };
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
-    const isMe      = currentUser && String(item.sender_id) === String(currentUser.user_id);
-    const prevItem  = index > 0 ? messages[index - 1] : null;
-    const showTime  = !prevItem ||
+    const isMe     = currentUser && String(item.sender_id) === String(currentUser.user_id);
+    const prevItem = index > 0 ? messages[index - 1] : null;
+    const showTime = !prevItem ||
       new Date(item.created_at).getTime() - new Date(prevItem.created_at).getTime() > 5 * 60_000;
 
     return (
@@ -189,31 +199,31 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#fff' },
-  loadingBox:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container:       { flex: 1, backgroundColor: '#fff' },
+  loadingBox:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: '#F3F3F3',
     backgroundColor: '#fff',
   },
-  headerAvatar:   { width: 40, height: 40, borderRadius: 20 },
-  headerName:     { fontSize: 15, fontWeight: '700', color: '#111' },
-  headerSub:      { fontSize: 11, color: '#999' },
-  messagesList:   { padding: 16, paddingBottom: 8, gap: 4 },
-  timeLabel:      { textAlign: 'center', fontSize: 11, color: '#bbb', marginVertical: 8 },
-  bubbleRow:      { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 2 },
-  bubbleRowMe:    { justifyContent: 'flex-end' },
-  bubbleRowThem:  { justifyContent: 'flex-start', gap: 8 },
-  bubbleAvatar:   { width: 28, height: 28, borderRadius: 14 },
+  headerAvatar:    { width: 40, height: 40, borderRadius: 20 },
+  headerName:      { fontSize: 15, fontWeight: '700', color: '#111' },
+  headerSub:       { fontSize: 11, color: '#999' },
+  messagesList:    { padding: 16, paddingBottom: 8, gap: 4 },
+  timeLabel:       { textAlign: 'center', fontSize: 11, color: '#bbb', marginVertical: 8 },
+  bubbleRow:       { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 2 },
+  bubbleRowMe:     { justifyContent: 'flex-end' },
+  bubbleRowThem:   { justifyContent: 'flex-start', gap: 8 },
+  bubbleAvatar:    { width: 28, height: 28, borderRadius: 14 },
   bubble: {
     maxWidth: '72%', paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 18,
   },
-  bubbleMe:       { backgroundColor: '#FF9D00', borderBottomRightRadius: 4 },
-  bubbleThem:     { backgroundColor: '#F1F1F1', borderBottomLeftRadius: 4 },
-  bubbleText:     { fontSize: 14, color: '#222', lineHeight: 20 },
-  bubbleTextMe:   { color: '#fff' },
+  bubbleMe:        { backgroundColor: '#FF9D00', borderBottomRightRadius: 4 },
+  bubbleThem:      { backgroundColor: '#F1F1F1', borderBottomLeftRadius: 4 },
+  bubbleText:      { fontSize: 14, color: '#222', lineHeight: 20 },
+  bubbleTextMe:    { color: '#fff' },
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: 12, paddingVertical: 10,

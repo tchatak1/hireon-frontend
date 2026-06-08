@@ -49,10 +49,12 @@ export default function ProfileScreen() {
     { icon: 'language-outline',         label: t('languages'),       key: 'languages', value: currentLangLabel },
     { icon: 'headset-outline',          label: t('contactUs'),       key: 'contact',   value: null },
     { icon: 'gift-outline',             label: t('inviteFriends'),   key: 'invite',    value: null },
+    { icon: 'card-outline', label: 'Subscription', key: 'subscription', value: null },
   ];
 
   const handleMenuPress = (key: string) => {
     if (key === 'languages') { setShowLangModal(true); return; }
+    if (key === 'subscription') { router.push('/subscription' as any); return; }
     Alert.alert(key, `${key} coming soon`);
   };
 

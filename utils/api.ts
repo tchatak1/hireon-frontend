@@ -350,3 +350,40 @@ export const updateUserProfile = async (updates: {
   if (!response.ok) throw new Error(data.detail || 'Failed to update profile');
   return data;
 };
+
+// ── Payment / Subscription ────────────────────────────────────────
+export const getPlans = async () => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/payment/plans`, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to load plans');
+  return data;
+};
+
+export const getSubscription = async () => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/payment/subscription`, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to load subscription');
+  return data;
+};
+
+export const initiatePayment = async (plan: string, phone_number: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/payment/initiate`, {
+    method:  'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ plan, phone_number }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Payment failed');
+  return data;
+};
+
+export const checkPaymentStatus = async (reference: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/payment/status/${reference}`, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to check status');
+  return data;
+};

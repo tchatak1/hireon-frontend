@@ -160,9 +160,20 @@ export default function NotificationsScreen({ onUnreadChange }: { onUnreadChange
       );
 
       fetchNotifications();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
-    }
+    }  catch (err: any) {
+  if (err.message?.includes('subscription')) {
+    Alert.alert(
+      '⚠️ Subscription Required',
+      'You need an active subscription to accept hire requests.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: '📋 Subscribe', onPress: () => router.push('/subscription' as any) },
+      ]
+    );
+  } else {
+    Alert.alert('Error', err.message);
+  }
+}
   };
 
   // Refuse request

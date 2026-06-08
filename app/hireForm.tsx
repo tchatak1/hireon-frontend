@@ -98,8 +98,19 @@ export default function HireFormScreen() {
         [{ text: 'OK', onPress: () => router.push('/home') }]
       );
     } catch (err: any) {
-      Alert.alert(t('failed'), err.message);
-    } finally {
+  if (err.message?.includes('subscription')) {
+    Alert.alert(
+      '⚠️ Subscription Required',
+      'You need an active subscription to send hire requests.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: '📋 Subscribe', onPress: () => router.push('/subscription' as any) },
+      ]
+    );
+  } else {
+    Alert.alert('Failed', err.message);
+  }
+}finally {
       setLoading(false);
     }
   };
