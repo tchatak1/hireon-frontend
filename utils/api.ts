@@ -387,3 +387,51 @@ export const checkPaymentStatus = async (reference: string) => {
   if (!response.ok) throw new Error(data.detail || 'Failed to check status');
   return data;
 };
+
+// ── Portfolio ─────────────────────────────────────────────────────
+// ── Portfolio ─────────────────────────────────────────────────────
+export const getUserPortfolio = async (userId: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/portfolio/${userId}`, { headers });
+  const data     = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to load portfolio');
+  return data;
+};
+
+export const createPortfolioPost = async (
+  images: { uri: string; type: string; name: string }[],
+  description: string
+) => {
+  const token    = await AsyncStorage.getItem('access_token');
+  const formData = new FormData();
+  if (description) formData.append('description', description);
+  images.forEach((img, i) => {
+    formData.append('images', {
+      uri:  img.uri,
+      type: img.type || 'image/jpeg',
+      name: img.name || `image_${i}.jpg`,
+    } as any);
+  });
+  const response = await fetch(`${BASE_URL}/portfolio`, {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type':  'multipart/form-data',
+    },
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to create post');
+  return data;
+};
+
+export const deletePortfolioPost = async (postId: string) => {
+  const headers  = await getAuthHeaders();
+  const response = await fetch(`${BASE_URL}/portfolio/${postId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Failed to delete post');
+  return data;
+};

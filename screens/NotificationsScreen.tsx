@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   Image,
+  TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
   Linking,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useLanguage } from '../context/LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getNotifications,
   acceptHireRequest,
@@ -118,6 +119,7 @@ export default function NotificationsScreen({ onUnreadChange }: { onUnreadChange
   const { t } = useLanguage();
 
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [currentUser,   setCurrentUser]   = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -160,20 +162,9 @@ export default function NotificationsScreen({ onUnreadChange }: { onUnreadChange
       );
 
       fetchNotifications();
-    }  catch (err: any) {
-  if (err.message?.includes('subscription')) {
-    Alert.alert(
-      '⚠️ Subscription Required',
-      'You need an active subscription to accept hire requests.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: '📋 Subscribe', onPress: () => router.push('/subscription' as any) },
-      ]
-    );
-  } else {
-    Alert.alert('Error', err.message);
-  }
-}
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   // Refuse request
@@ -272,18 +263,19 @@ export default function NotificationsScreen({ onUnreadChange }: { onUnreadChange
     const name = item.client?.name || '';
     const date = item.request?.scheduled_date || '';
     const time = item.request?.scheduled_time || '';
+    const tAny = t as (key: string) => string;
     switch (item.type) {
       case 'hire_request':
-        return t('notif_hire_request' as any)
+        return tAny('notif_hire_request')
           .replace('{name}', name).replace('{date}', date).replace('{time}', time);
       case 'request_accepted':
-        return t('notif_request_accepted' as any).replace('{name}', name);
+        return tAny('notif_request_accepted').replace('{name}', name);
       case 'request_refused':
-        return t('notif_request_refused' as any).replace('{name}', name);
+        return tAny('notif_request_refused').replace('{name}', name);
       case 'job_completed':
-        return t('notif_job_completed' as any);
+        return tAny('notif_job_completed');
       default:
-        return item.message || t('notif_unknown' as any);
+        return item.message || tAny('notif_unknown');
     }
   };
 
@@ -587,15 +579,16 @@ export default function NotificationsScreen({ onUnreadChange }: { onUnreadChange
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Ionicons
-          name="person-circle-outline"
-          size={32}
-          color="#FF9D00"
+        <Image
+          source={
+            currentUser?.profile_picture
+              ? { uri: currentUser.profile_picture }
+              : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' }
+          }
+          style={styles.headerAvatar}
         />
 
-        <Text style={styles.headerTitle}>
-          Notifications
-        </Text>
+        <Text style={styles.headerTitle}>{t('notifications')}</Text>
 
         <View style={styles.headerIcons}>
           <Ionicons

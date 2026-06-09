@@ -2,16 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, Image, KeyboardAvoidingView,
-  Platform, ActivityIndicator, SafeAreaView, Alert,
+  Platform, ActivityIndicator, Alert, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMessages, sendMessage } from '../utils/api';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function ChatScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { conversation_id, other_name, other_image } = useLocalSearchParams<{
     conversation_id: string;
     other_user_id:   string;
@@ -26,6 +28,7 @@ export default function ChatScreen() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const { t }   = useLanguage();
+  const tAny    = t as (key: string) => string;
   const listRef = useRef<FlatList>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -61,16 +64,16 @@ export default function ChatScreen() {
     } catch (err: any) {
       if (err.message?.includes('subscription')) {
         Alert.alert(
-          '⚠️ Subscription Required',
-          'You need an active subscription to send messages.',
+          t('subscriptionRequired'),
+          t('subRequiredMessage'),
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: '📋 Subscribe', onPress: () => router.push('/subscription' as any) },
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('subscribeBtn'), onPress: () => router.push('/subscription' as any) },
           ]
         );
       } else {
         setInput(text);
-        Alert.alert('Error', err.message || 'Failed to send message');
+        Alert.alert(t('error'), err.message || 'Failed to send message');
       }
     } finally {
       setSending(false);
@@ -79,7 +82,6 @@ export default function ChatScreen() {
 
   const getRelativeTime = (dateStr: string): string => {
     if (!dateStr) return '';
-    const tAny     = t as (key: string) => string;
     const diffMs   = Date.now() - new Date(dateStr).getTime();
     const diffMins = Math.floor(diffMs / 60_000);
     if (diffMins < 1)   return tAny('justNow');
@@ -122,84 +124,91 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
-          <Ionicons name="arrow-back" size={24} color="#111" />
-        </TouchableOpacity>
-        <Image
-          source={
-            other_image
-              ? { uri: other_image }
-              : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' }
-          }
-          style={styles.headerAvatar}
-        />
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.headerName}>{other_name}</Text>
-          <Text style={styles.headerSub}>{t('tapViewProfile')}</Text>
-        </View>
-        <Ionicons name="ellipsis-vertical" size={22} color="#111" />
-      </View>
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="#FF9D00" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FF9D00' }} edges={['top']}>
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
 
-      {/* Messages */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
-      >
-        {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#FF9D00" />
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
+              <Ionicons name="arrow-back" size={24} color="#111" />
+            </TouchableOpacity>
+            <Image
+              source={
+                other_image
+                  ? { uri: other_image }
+                  : { uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' }
+              }
+              style={styles.headerAvatar}
+            />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.headerName}>{other_name}</Text>
+              <Text style={styles.headerSub}>{t('tapViewProfile')}</Text>
+            </View>
+            <Ionicons name="ellipsis-vertical" size={22} color="#111" />
           </View>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(item) => item.message_id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.messagesList}
-            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-            ListEmptyComponent={
-              <View style={styles.emptyBox}>
-                <Ionicons name="chatbubble-ellipses-outline" size={48} color="#ddd" />
-                <Text style={styles.emptyText}>{t('sayHello')}</Text>
-              </View>
-            }
-          />
-        )}
 
-        {/* Input bar */}
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('typeMessage')}
-            placeholderTextColor="#999"
-            value={input}
-            onChangeText={setInput}
-            multiline
-            maxLength={1000}
-            onSubmitEditing={handleSend}
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={!input.trim() || sending}
+          {/* Messages + Input */}
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
           >
-            {sending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Ionicons name="send" size={18} color="#fff" />
-            }
-          </TouchableOpacity>
+            {loading ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color="#FF9D00" />
+              </View>
+            ) : (
+              <FlatList
+                ref={listRef}
+                data={messages}
+                keyExtractor={(item) => item.message_id}
+                renderItem={renderMessage}
+                contentContainerStyle={styles.messagesList}
+                onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+                ListEmptyComponent={
+                  <View style={styles.emptyBox}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={48} color="#ddd" />
+                    <Text style={styles.emptyText}>{t('sayHello')}</Text>
+                  </View>
+                }
+              />
+            )}
+
+            {/* Input bar — sits above bottom safe area */}
+            <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 10 }]}>
+              <TextInput
+                style={styles.input}
+                placeholder={t('typeMessage')}
+                placeholderTextColor="#999"
+                value={input}
+                onChangeText={setInput}
+                multiline
+                maxLength={1000}
+              />
+              <TouchableOpacity
+                style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={!input.trim() || sending}
+              >
+                {sending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="send" size={18} color="#fff" />
+                }
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+      {/* Orange bottom bar for Android */}
+      <View style={{ height: insets.bottom, backgroundColor: '#FF9D00' }} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#fff' },
   loadingBox:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center',
@@ -226,7 +235,7 @@ const styles = StyleSheet.create({
   bubbleTextMe:    { color: '#fff' },
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 12, paddingVertical: 10,
+    paddingHorizontal: 12, paddingTop: 10,
     borderTopWidth: 1, borderTopColor: '#F0F0F0',
     backgroundColor: '#fff', gap: 10,
   },
